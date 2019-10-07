@@ -49,7 +49,6 @@
 
 (in-theory (disable rp-iff-flag rp-lhs rp-rhs rp-hyp))
 
-
 (local
  (encapsulate
    nil
@@ -114,32 +113,38 @@
               :do-not-induct t
               :use ((:instance rp-evl-and-side-cond-consistent-of-rp-rw
                                (term term #|(REMOVE-RETURN-LAST TERM)||#)
-                               (dont-rw nil)
+                               (dont-rw (MV-NTH 0 (GENERATE-DONT-RW-FROM-TERM TERM)))
                                (context nil)
                                (limit (NTH *RW-STEP-LIMIT* RP-STATE))
                                (iff-flg t))
                     (:instance rp-evl-and-side-cond-consistent-of-rp-rw
                                (term (CADR term #|(REMOVE-RETURN-LAST TERM)||#))
-                               (dont-rw nil)
+                               (dont-rw (MV-NTH 0 (GENERATE-DONT-RW-FROM-TERM
+                                                   (cadr TERM))))
                                (context nil)
                                (limit (NTH *RW-STEP-LIMIT* RP-STATE))
                                (iff-flg t))
                     (:instance rp-evl-and-side-cond-consistent-of-rp-rw
                                (term (CADDR term #|(REMOVE-RETURN-LAST TERM)||#))
-                               (dont-rw nil)
+                               (dont-rw (MV-NTH 0 (GENERATE-DONT-RW-FROM-TERM
+                                                   (caddr TERM))))
                                (context (RP-EXTRACT-CONTEXT
                                          (MV-NTH 0
                                                  (RP-RW (CADR term #|(REMOVE-RETURN-LAST TERM)||#)
-                                                        NIL NIL (NTH *RW-STEP-LIMIT* RP-STATE)
+                                                        (MV-NTH 0
+                                                                (GENERATE-DONT-RW-FROM-TERM (CADR TERM)))
+                                                        NIL (NTH *RW-STEP-LIMIT* RP-STATE)
                                                         RULES-ALIST EXC-RULES
                                                         meta-rules T rp-state STATE))))
                                (limit (NTH *RW-STEP-LIMIT* RP-STATE))
                                (iff-flg t)
-                               (rp-state (MV-NTH 1
-                                             (RP-RW (CADR term #|(REMOVE-RETURN-LAST TERM)||#)
-                                                    NIL NIL (NTH *RW-STEP-LIMIT* RP-STATE)
-                                                    RULES-ALIST EXC-RULES
-                                                    meta-rules T rp-state STATE)))))
+                               (rp-state (MV-NTH 2
+                                                 (RP-RW (CADR TERM)
+                                                        (MV-NTH 0
+                                                                (GENERATE-DONT-RW-FROM-TERM (CADR TERM)))
+                                                        NIL (NTH *RW-STEP-LIMIT* RP-STATE)
+                                                        RULES-ALIST
+                                                        EXC-RULES META-RULES T RP-STATE STATE)))))
 ;:expand ((:free (context) (CONTEXT-SYNTAXP context)))
               :in-theory (e/d (;rp-evl-of-remove-from-last
                                context-syntaxp-implies
@@ -158,8 +163,23 @@
                                INCLUDE-FNC
                                PSEUDO-TERMP2
                                TRUE-LISTP
+
+                               (:DEFINITION ACL2::APPLY$-BADGEP)
+                               (:LINEAR ACL2::APPLY$-BADGEP-PROPERTIES . 1)
+                               (:REWRITE ACL2::O-P-O-INFP-CAR)
+                               (:DEFINITION SUBSETP-EQUAL)
+                               (:DEFINITION MEMBER-EQUAL)
+                               (:REWRITE PSEUDO-TERM-LISTP2-IS-TRUE-LISTP)
+                               (:DEFINITION PSEUDO-TERM-LISTP2)
+                               (:REWRITE EVL-OF-EXTRACT-FROM-RP-2)
+                               (:REWRITE
+                                    ACL2::MEMBER-EQUAL-NEWVAR-COMPONENTS-1)
                                
-                               ;remove-return-last
+                               
+                               (:REWRITE VALID-SC-CONS)
+                               (:REWRITE VALID-SC-CADR)
+                               
+;remove-return-last
                                beta-search-reduce)))))))
 
 (defthmd no-rp-no-falist-term-implies-valid-termp

@@ -40,7 +40,7 @@
 
 (include-book "aux-functions")
 
-(encapsulate
+#|(encapsulate
   nil
 
   (defthm dont-rw-syntaxp-aux-cons
@@ -49,7 +49,6 @@
                    ; (strict-quotep a)
                     (DONT-RW-SYNTAXP-AUX a))
                 (DONT-RW-SYNTAXP-AUX b))))
-  
 
   (defthm dont-rw-syntaxp-cons
     (equal (dont-rw-syntaxp  (cons a b))
@@ -59,4 +58,45 @@
                         (DONT-RW-SYNTAXP-AUX a))
                     (DONT-RW-SYNTAXP-AUX b))))
     :hints (("Goal"
-             :in-theory (e/d (dont-rw-syntaxp) ())))))
+             :in-theory (e/d (dont-rw-syntaxp) ())))))||#
+
+(encapsulate
+  nil
+  (local
+   (include-book "ihs/ihs-lemmas" :dir :system))
+
+  (local
+   (in-theory (disable acl2::logcdr
+                       acl2::logcar
+                       logapp)))
+
+  (defthm natp-logcdr
+    (implies (and (natp x))
+             (natp (acl2::logcdr x)))
+    :rule-classes :type-prescription)
+
+  (defthm natp-logcar
+    (implies (and (natp x))
+             (natp (acl2::logcar x)))
+    :rule-classes :type-prescription)
+
+  (defthm natp-logapp
+    (implies (and (natp y)
+                  (natp x)
+                  (natp size))
+             (natp (logapp size x y)))
+    :rule-classes :type-prescription)
+
+  (defthm natp-ash
+    (implies (and (natp y)
+                  (integerp size))
+             (natp (ash y size)))
+    :hints (("Goal"
+             :in-theory (e/d (ash) ())))
+    :rule-classes :type-prescription)
+
+  (defthm natp-logapp-rw
+    (implies (and (natp y)
+                  (natp x)
+                  (natp size))
+             (natp (logapp size x y)))))

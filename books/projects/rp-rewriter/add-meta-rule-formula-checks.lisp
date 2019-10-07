@@ -259,3 +259,4 @@
     :hints (("Goal"
              :in-theory (e/d (RP-META-VALID-SYNTAX-LISTP)
                              (RP-META-VALID-SYNTAXP-SK))))))
+

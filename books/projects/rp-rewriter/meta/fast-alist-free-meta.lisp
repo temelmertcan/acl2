@@ -56,11 +56,11 @@
     (('fast-alist-free ('falist ('quote fast-alist) alist))
      (progn$
       (fast-alist-free fast-alist)
-      (mv alist t)))
+      (mv alist 1 1)))
     (('fast-alist-free alist)
-     (mv alist t))
+     (mv alist 1 1))
     (&
-     (mv term nil))))
+     (mv term 1 1))))
 
 (def-formula-checks-default-evl
  rp-evl
@@ -112,11 +112,11 @@
 
 
 (local
- (defthm dont-rw-syntaxp-fast-alist-free-meta
-   (dont-rw-syntaxp (mv-nth 1 (fast-alist-free-meta term)))
+ (defthm nat-dont-fast-alist-free-meta
+   (and (natp (mv-nth 1 (fast-alist-free-meta term)))
+        (natp (mv-nth 2 (fast-alist-free-meta term))))
    :hints (("Goal"
-            :in-theory (e/d (DONT-RW-SYNTAXP
-                             fast-alist-free-meta)
+            :in-theory (e/d (fast-alist-free-meta)
                             ())))))
 
 
@@ -137,6 +137,7 @@
                             fast-alist-free-meta
                             PSEUDO-TERM-LISTP2
                             RP-SYNTAXP
+                            natp
                             VALID-SC)))))
 
 

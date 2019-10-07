@@ -87,15 +87,25 @@
                             rp-syntaxp
                             pseudo-termp2)))))
 
-(defthm rp-rw-meta-rule-returns-valid-dont-rw-syntaxp
+
+#|(local
+ (defthm meta-fnc-is-logicp
+   (implies (RP-META-VALID-SYNTAXP-SK META-RULE STATE)
+            (ACL2::LOGICP (RP-META-FNC META-RULE)
+                          (W STATE)))
+   :hints (("Goal"
+            :in-theory (e/d (RP-META-VALID-SYNTAXP) ())))))||#
+
+(defthm rp-rw-meta-rule-returns-valid-dont-rw
   (implies (and (rp-meta-valid-syntaxp-sk meta-rule state))
-           (dont-rw-syntaxp (mv-nth 2 (rp-rw-meta-rule term meta-rule rp-state state))))
+           (natp (mv-nth 2 (rp-rw-meta-rule term meta-rule rp-state
+                                                 state))))
   :otf-flg t
+  :rule-classes :type-prescription
   :hints (("goal"
            :use ((:instance rp-meta-valid-syntaxp-sk-necc (state- state)))
            :expand ((:free (x y) (mv-nth x y)))
            :in-theory (e/d (rp-meta-valid-syntax-listp
-                            mv-nth
                             rp-meta-valid-syntaxp)
                            (all-falist-consistent
                             rp-meta-valid-syntaxp-sk-necc
@@ -105,13 +115,91 @@
                             rp-meta-trig-fnc
                             rp-meta-fnc
                             rp-syntaxp
+                            mv-nth
+                            w
+                            (:DEFINITION ACL2::APPLY$-BADGEP)
+                            (:DEFINITION SUBSETP-EQUAL)
+                            (:DEFINITION MEMBER-EQUAL)
+                            (:REWRITE DEFAULT-CDR)
+                            (:REWRITE
+                             ACL2::MEMBER-EQUAL-NEWVAR-COMPONENTS-1)
+                            (:REWRITE ACL2::APPLY$-BADGEP-PROPERTIES . 1)
+                            (:REWRITE ACL2::APPLY$-BADGEP-PROPERTIES . 2)
+                            (:LINEAR ACL2::APPLY$-BADGEP-PROPERTIES . 1)
+                            (:LINEAR ACL2::APPLY$-BADGEP-PROPERTIES . 2)
+                            (:REWRITE DEFAULT-CAR)
+                            (:REWRITE PSEUDO-TERM-LISTP2-IS-TRUE-LISTP)
+                            (:DEFINITION PSEUDO-TERM-LISTP2)
                             pseudo-termp2)))))
 
-(defthm rp-rw-meta-rules-returns-valid-dont-rw-syntaxp
+(defthm rp-rw-meta-rule-returns-valid-dont-rw-size
+  (implies (and (rp-meta-valid-syntaxp-sk meta-rule state))
+           (natp (mv-nth 3 (rp-rw-meta-rule term meta-rule rp-state
+                                                 state))))
+  :otf-flg t
+  :rule-classes :type-prescription
+  :hints (("goal"
+           :use ((:instance rp-meta-valid-syntaxp-sk-necc (state- state)))
+           :expand ((:free (x y) (mv-nth x y)))
+           :in-theory (e/d (rp-meta-valid-syntax-listp
+                            mv-nth
+                            rp-meta-valid-syntaxp)
+                           (all-falist-consistent
+                            rp-meta-valid-syntaxp-sk-necc
+                            rp-meta-valid-syntaxp-sk
+                            (:DEFINITION ACL2::APPLY$-BADGEP)
+                            (:DEFINITION SUBSETP-EQUAL)
+                            (:DEFINITION MEMBER-EQUAL)
+                            (:REWRITE DEFAULT-CDR)
+                            (:REWRITE
+                             ACL2::MEMBER-EQUAL-NEWVAR-COMPONENTS-1)
+                            (:REWRITE ACL2::APPLY$-BADGEP-PROPERTIES . 1)
+                            (:REWRITE ACL2::APPLY$-BADGEP-PROPERTIES . 2)
+                            (:LINEAR ACL2::APPLY$-BADGEP-PROPERTIES . 1)
+                            (:LINEAR ACL2::APPLY$-BADGEP-PROPERTIES . 2)
+                            (:REWRITE DEFAULT-CAR)
+                            (:REWRITE PSEUDO-TERM-LISTP2-IS-TRUE-LISTP)
+                            (:TYPE-PRESCRIPTION
+                                    RP-STATE-PUSH-META-TO-RW-STACK)
+                            RP-META-SYNTAX-VERIFIED
+                            rp-meta-dont-rw
+                            rp-meta-trig-fnc
+                            rp-meta-fnc
+                            rp-syntaxp
+                            pseudo-termp2)))))
+
+(defthm rp-rw-meta-rules-returns-valid-dont-rw
   (implies (and (rp-meta-valid-syntax-listp meta-rules state))
-           (dont-rw-syntaxp (mv-nth 2 (rp-rw-meta-rules term meta-rules rp-state state))))
+           (natp (mv-nth 2 (rp-rw-meta-rules term meta-rules rp-state
+                                             state))))
+  :RULE-CLASSES :type-prescription
+  :hints (("goal"
+           :expand (RP-RW-META-RULES TERM NIL RP-STATE STATE)
+           :in-theory (e/d (rp-meta-valid-syntax-listp
+                            RP-RW-META-RULES
+                            mv-nth
+                            )
+                           (all-falist-consistent
+                            natp
+                            acl2::MV-NTH-CONS-META
+                            RP-META-SYNTAX-VERIFIED
+                            RP-META-VALID-SYNTAXP-SK
+                            RP-RW-META-RULE
+                            rp-meta-valid-syntaxp
+                            rp-meta-dont-rw
+                            rp-meta-trig-fnc
+                            rp-meta-fnc
+                            rp-syntaxp
+                            pseudo-termp2)))))
+
+(defthm rp-rw-meta-rules-returns-valid-dont-rw-size
+  (implies (and (rp-meta-valid-syntax-listp meta-rules state))
+           (natp (mv-nth 3 (rp-rw-meta-rules term meta-rules rp-state
+                                                  state))))
+  :RULE-CLASSES :type-prescription
   :hints (("goal"
            :in-theory (e/d (rp-meta-valid-syntax-listp
+                            RP-RW-META-RULES
                             mv-nth
                             )
                            (all-falist-consistent
@@ -142,13 +230,28 @@
                             (term2 (mv-nth 1 (rp-rw-meta-rule term meta-rule rp-state state)))))
            :in-theory (e/d (mv-nth)
                            (valid-rp-meta-rulep-necc
+
+                            rp-syntaxp
+                            all-falist-consistent
+                            pseudo-termp2
+                            
                             RP-META-SYNTAX-VERIFIED
                             acl2::MV-NTH-CONS-META
                             VALID-SC
                             rp-meta-dont-rw
                             rp-meta-trig-fnc
+                            (:DEFINITION ACL2::APPLY$-BADGEP)
+                            (:REWRITE ACL2::APPLY$-BADGEP-PROPERTIES . 3)
+                            (:DEFINITION SUBSETP-EQUAL)
+                            (:DEFINITION MEMBER-EQUAL)
+                            (:REWRITE DEFAULT-CAR)
+                            (:REWRITE
+                                    ACL2::MEMBER-EQUAL-NEWVAR-COMPONENTS-1)
+                            (:REWRITE DEFAULT-CDR)
                             rp-meta-fnc
-                            VALID-RP-META-RULEP)))))
+                            VALID-RP-META-RULEP
+
+                            (:REWRITE PSEUDO-TERM-LISTP2-IS-TRUE-LISTP))))))
 
 (defthm rp-rw-meta-rules-returns-valid-sc
   (implies (and (valid-sc term a)
@@ -160,7 +263,8 @@
            :use ((:instance valid-rp-meta-rulep-necc
                             (rule (car meta-rules))
                             (state- state)))
-           :in-theory (e/d (mv-nth)
+           :in-theory (e/d (mv-nth
+                            RP-RW-META-RULES)
                            (valid-rp-meta-rulep-necc
                             rp-rw-meta-rule
                             rp-meta-dont-rw
@@ -219,7 +323,7 @@
                           a)
                   (rp-evl term a)))
   :hints (("Goal"
-           :in-theory (e/d (
+           :in-theory (e/d (RP-RW-META-RULES
                             VALID-RP-META-RULE-LISTP)
                            (evals-equal-sk
                             mv-nth
@@ -252,14 +356,14 @@
 
 (defthm rp-statep-rp-rw-meta-rule
   (implies (rp-statep rp-state)
-           (rp-statep (mv-nth 3 (rp-rw-meta-rule term meta-rule rp-state state))))
+           (rp-statep (mv-nth 4 (rp-rw-meta-rule term meta-rule rp-state state))))
   :hints (("Goal"
            :in-theory (e/d (rp-stat-add-to-rules-used-meta-cnt) ()))))
 
 
 (defthm rp-statep-rp-rw-meta-rules
   (implies (rp-statep rp-state)
-           (rp-statep (mv-nth 3 (rp-rw-meta-rules term meta-rules rp-state state))))
+           (rp-statep (mv-nth 4 (rp-rw-meta-rules term meta-rules rp-state state))))
   :hints (("Goal"
-           :in-theory (e/d () (rp-statep
+           :in-theory (e/d (RP-RW-META-RULES) (rp-statep
                                rp-rw-meta-rule)))))

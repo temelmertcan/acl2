@@ -50,6 +50,8 @@
 
 (make-flag get-lambda-free-vars :defthm-macro-name defthm-get-lambda-free-vars)
 
+(make-flag cut-dont-rw-with-term :defthm-macro-name defthm-cut-dont-rw-with-term)
+
 (local
  (make-flag get-lambda-free-vars :defthm-macro-name
             defthm-get-lambda-free-vars))
@@ -578,7 +580,7 @@
   :in-theory (e/d () (is-falist falist-consistent-aux
   falist-consistent)))))||#)
 
-(defthm dont-rw-syntaxp-dont-rw-if-fix
+#|(defthm dont-rw-syntaxp-dont-rw-if-fix
   (implies (and (dont-rw-syntaxp dont-rw))
            (and (dont-rw-syntaxp (dont-rw-if-fix dont-rw))
                 (dont-rw-syntaxp (cadr (dont-rw-if-fix dont-rw)))
@@ -587,7 +589,7 @@
   :hints (("Goal"
            :in-theory (e/d (dont-rw-syntaxp
                             dont-rw-if-fix)
-                           ()))))
+                           ()))))||#
 
 #|(encapsulate
   nil
@@ -752,20 +754,23 @@
 
 (defthmd rule-syntaxp-implies
   (implies (rule-syntaxp rule)
-           (and
-            (weak-custom-rewrite-rule-p rule)
-            (pseudo-termp2 (rp-hyp rule))
-            (pseudo-termp2 (rp-lhs rule))
-            (pseudo-termp2 (rp-rhs rule))
-            ;; (rp-syntaxp (rp-lhs rule))
-            (not (include-fnc (rp-lhs rule) 'rp))
-            (not (include-fnc (rp-hyp rule) 'rp))
-            (rp-syntaxp (rp-rhs rule))
-            (not (include-fnc (rp-rhs rule) 'falist))
-            (not (include-fnc (rp-hyp rule) 'falist))
-            (not (include-fnc (rp-lhs rule) 'if))
-            (not (include-fnc (rp-lhs rule) 'synp))
-            (no-free-variablep rule)))
+           (AND (WEAK-CUSTOM-REWRITE-RULE-P RULE)
+                (PSEUDO-TERMP2 (RP-HYP RULE))
+                (PSEUDO-TERMP2 (RP-LHS RULE))
+                (PSEUDO-TERMP2 (RP-RHS RULE))
+                (NOT (INCLUDE-FNC (RP-LHS RULE) 'RP))
+                (NOT (INCLUDE-FNC (RP-HYP RULE) 'RP))
+                (RP-SYNTAXP (RP-RHS RULE))
+                (NOT (INCLUDE-FNC (RP-RHS RULE) 'FALIST))
+                (NOT (INCLUDE-FNC (RP-HYP RULE) 'FALIST))
+                (NOT (INCLUDE-FNC (RP-LHS RULE) 'IF))
+                (CONSP (RP-LHS RULE))
+                (NOT (ACL2::FQUOTEP (RP-LHS RULE)))
+                (NOT (INCLUDE-FNC (RP-LHS RULE) 'SYNP))
+                (NATP (RP-DONT-RW-SIZE RULE))
+                (NATP (RP-DONT-RW RULE))
+                (NATP (RP-HYP-DONT-RW RULE))
+                (NO-FREE-VARIABLEP RULE)))
   :hints (("Goal" :in-theory (enable rule-syntaxp))))
 
 
@@ -965,14 +970,27 @@
            :in-theory (e/d (ex-from-rp
                             is-rp) ()))))
 
-
+#|
 (defthm dont-rw-syntaxp-dont-rw-syntax-fix
   (dont-rw-syntaxp (dont-rw-syntax-fix dont-rw))
   :hints (("Goal"
            :in-theory (e/d (dont-rw-syntax-fix)
-                           (DONT-RW-SYNTAXP)))))
+                           (DONT-RW-SYNTAXP)))))||#
 
  
-(defthm pseudo-termp2-implies-dont-rw-syntaxp
+#|(defthm pseudo-termp2-implies-dont-rw-syntaxp
   (implies (pseudo-termp2 term)
-	   (dont-rw-syntaxp term)))
+	   (dont-rw-syntaxp term)))||#
+
+
+(defthm-cut-dont-rw-with-term
+  (defthm natp-cut-dont-rw-with-term
+    (implies (natp dont-rw)
+             (natp (cut-dont-rw-with-term dont-rw term)))
+    :flag cut-dont-rw-with-term
+    :rule-classes :type-prescription)
+  (defthm natp-cut-dont-rw-with-term-lst
+    (implies (natp dont-rw)
+             (natp (cut-dont-rw-with-term dont-rw lst)))
+    :flag cut-dont-rw-with-term-lst
+    :rule-classes :type-prescription))

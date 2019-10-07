@@ -108,9 +108,9 @@
   (case-match term
     (('equal a b)
      (if (rp-equal  a b)
-         (mv ''t t)
-       (mv term `(nil t t))))
-    (& (mv term nil))))
+         (mv ''t 1 1)
+       (mv term #b110 3)))
+    (& (mv term 1 1))))
 
 (local
  (defthm rp-valid-termp-rp-equal-meta
@@ -145,8 +145,9 @@
             :in-theory (e/d (rp-equal-meta)
                             ())))))
 
-(defthm dont-rw-syntaxp-rp-equal-meta
-  (dont-rw-syntaxp (mv-nth 1  (rp-equal-meta term)))
+(defthm natp-dont-rw-of-rp-equal-meta
+  (and (natp (mv-nth 1 (rp-equal-meta term)))
+       (natp (mv-nth 2 (rp-equal-meta term))))
   :hints (("Goal"
            :in-theory (e/d (rp-equal-meta) ()))))
 
@@ -167,6 +168,7 @@
                             rp-equal-meta
                             PSEUDO-TERM-LISTP2
                             RP-SYNTAXP
+                            natp
                             VALID-SC)))))
 (rp::add-meta-rules
  rp-equal-meta-formula-checks

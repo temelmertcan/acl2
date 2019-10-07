@@ -41,6 +41,15 @@
 (include-book "std/lists/remove-duplicates" :dir :system)
 (include-book "misc/beta-reduce" :dir :system)
 (include-book "tools/flag" :dir :system)
+(include-book "ihs/basic-definitions" :dir :system)
+(include-book "std/util/defines" :dir :system)
+
+(include-book "std/strings/cat-base" :dir :system)
+
+(include-book "macros" )
+
+(local
+ (include-book "ihs/ihs-lemmas" :dir :system))
 
 ;; Functions and lemmas used by both correctness proofs (rp-correct.lisp) and
 ;; guards (rp-rewriter.lisp)
@@ -596,7 +605,7 @@
 (encapsulate
   nil
   (defrec custom-rewrite-rule
-    (lhs (flg . hyp) rule-fnc . (rhs . rune))
+    ((lhs . flg) (hyp . hyp-dont-rw) (rhs dont-rw . dont-rw-size) . (rune . rule-fnc))
     t) ; t when we are confident that the code is OK
 
   (defun weak-custom-rewrite-rule-listp (rules)
@@ -632,7 +641,19 @@
 
   (defun-inline rp-rule-fnc (rule)
     (declare (xargs :guard (weak-custom-rewrite-rule-p rule)))
-    (access custom-rewrite-rule rule :rule-fnc)))
+    (access custom-rewrite-rule rule :rule-fnc))
+
+  (defun-inline rp-hyp-dont-rw (rule)
+    (declare (xargs :guard (weak-custom-rewrite-rule-p rule)))
+    (access custom-rewrite-rule rule :hyp-dont-rw))
+
+  (defun-inline rp-dont-rw (rule)
+    (declare (xargs :guard (weak-custom-rewrite-rule-p rule)))
+    (access custom-rewrite-rule rule :dont-rw))
+
+  (defun-inline rp-dont-rw-size (rule)
+    (declare (xargs :guard (weak-custom-rewrite-rule-p rule)))
+    (access custom-rewrite-rule rule :dont-rw-size)))
 
 (encapsulate
   nil
@@ -739,14 +760,14 @@
          (consp (cdr term))
          (not (cddr term))))
 
-  (defun dont-rw-syntaxp-aux (dont-rw)
+  #|(defun dont-rw-syntaxp-aux (dont-rw)
     (declare (xargs :guard t))
     (if (atom dont-rw)
         t
       (and (or (atom (car dont-rw))
 ;(strict-quotep (car dont-rw))
                (dont-rw-syntaxp-aux (car dont-rw)))
-           (dont-rw-syntaxp-aux (cdr dont-rw)))))
+           (dont-rw-syntaxp-aux (cdr dont-rw)))))||#
 
   #|(defun dont-rw-syntaxp-aux (dont-rw)
   (declare (xargs :guard t))
@@ -756,18 +777,18 @@
   (dont-rw-syntaxp-aux (car dont-rw)))
   (dont-rw-syntaxp-aux (cdr dont-rw)))))||#
 
-  (defund dont-rw-syntaxp (dont-rw)
+  #|(defund dont-rw-syntaxp (dont-rw)
     (declare (xargs :guard t))
     (or (atom dont-rw)
         ;;(strict-quotep dont-rw)
-        (dont-rw-syntaxp-aux dont-rw)))
+        (dont-rw-syntaxp-aux dont-rw)))||#
 
   (define should-not-rw (dont-rw)
+    :guard (integerp dont-rw)
     :inline t
-    (and (atom dont-rw)
-         dont-rw))
+    (= (acl2::logcar dont-rw) 1))
 
-  (defund dont-rw-syntax-fix (dont-rw)
+  #|(defund dont-rw-syntax-fix (dont-rw)
     (declare (xargs :guard t))
     (if (dont-rw-syntaxp dont-rw)
         dont-rw
@@ -775,7 +796,7 @@
                           "this dont'rw is being fixed. This should have
     not happened... ~p0 ~%"
                           (list (cons #\0 dont-rw)))
-              t))))
+              t)))||#)
 
 (encapsulate
   nil
@@ -1080,7 +1101,6 @@
        (and (rp-equal-cnt (car subterm1) (car subterm2) cnt)
             (rp-equal-cnt-subterms (cdr subterm1) (cdr subterm2) cnt)))))
 
-
   (mutual-recursion
    ;; check if two terms are equivalent by discarding rp terms
    (defun p-rp-equal-cnt (term1 term2 cnt)
@@ -1144,6 +1164,11 @@
      (consp (rp-lhs rule))
      (not (acl2::fquotep (rp-lhs rule)))
      (not (include-fnc (rp-lhs rule) 'synp))
+
+     (natp (rp-dont-rw-size rule))
+     (natp (rp-dont-rw rule))
+     (natp (rp-hyp-dont-rw rule))
+     
      (no-free-variablep rule)))
 
   (defun rule-list-syntaxp (rules)
@@ -1263,7 +1288,8 @@
             (acl2::logicp (rp-meta-fnc meta-rule) (w state)))
        (and (if (rp-meta-dont-rw meta-rule)
                 (and
-                 (dont-rw-syntaxp (mv-nth 1 res))
+                 (natp (mv-nth 1 res))
+                 (natp (mv-nth 2 res))
                  (if (rp-meta-syntax-verified meta-rule)
                      (implies (rp-valid-termp term)
                               (rp-valid-termp (mv-nth 0 res)))
@@ -1357,7 +1383,6 @@
         (rp-beta-reduce (caddr (car term)) (cadar term) (cdr term))
       term)))
 
-
 (encapsulate
   nil
 
@@ -1424,3 +1449,207 @@
               (true-listp (merge-comperator-sort l comperator)))))
 
   (verify-guards merge-comperator-sort))
+
+
+
+(acl2::defines
+ generate-dont-rw-from-term
+ :verify-guards nil
+ :prepwork
+ ((local
+   (in-theory (disable logapp natp))))
+ (define generate-dont-rw-from-term (term)
+   :returns (mv (dont-rw natp)
+                (size natp))
+   (cond ((or (atom term)
+              (acl2::fquotep term))
+          (mv 1 1))
+         ((eq (car term) 'synp)
+          (mv 1 1))
+         ((eq (car term) 'hide)
+          (mv 2 2))
+         ;; skip synp and insides of hide.
+         (t (b* (((mv rest rest-size)
+                  (generate-dont-rw-from-term-lst (cdr term))))
+              (mv (logapp 1 0 rest)
+                  (1+ rest-size))))))
+ (define generate-dont-rw-from-term-lst (lst)
+   :returns (mv (dont-rw natp)
+                (size natp))
+   (if (atom lst)
+       (mv 0 0)
+     (b* (((mv rest1 rest1-size)
+           (generate-dont-rw-from-term (car lst)))
+          ((mv rest2 rest2-size)
+           (generate-dont-rw-from-term-lst (cdr lst))))
+       (mv (logapp rest1-size rest1 rest2)
+           (+ rest1-size rest2-size)))))
+ ///
+ (verify-guards generate-dont-rw-from-term))
+
+(acl2::defines
+ cut-dont-rw-with-term
+ (define cut-dont-rw-with-term ((dont-rw natp)
+                                (term))
+   :returns (res natp :hyp (natp dont-rw))
+   :measure (acl2-count term)
+   :verify-guards nil
+   (cond
+    ((or (atom term)
+         (acl2::fquotep term))
+     (progn$ (and (equal (acl2::logcar dont-rw) 0)
+                  (hard-error 'cut-dont-rw-with-term
+                              "Unexpected dont-rw"
+                              nil))
+             (acl2::logcdr dont-rw)))
+    ((= (acl2::logcar dont-rw) 1)
+     (acl2::logcdr dont-rw))
+    (t (cut-dont-rw-with-term-lst (acl2::logcdr dont-rw) (cdr term)))))
+ (define cut-dont-rw-with-term-lst ((dont-rw natp)
+                                    (lst))
+   :measure (acl2-count lst)
+   :returns (res natp :hyp (natp dont-rw))
+   (if (atom lst)
+       dont-rw
+     (cut-dont-rw-with-term-lst
+      (cut-dont-rw-with-term dont-rw (car lst))
+      (cdr lst))))
+ ///
+ (verify-guards cut-dont-rw-with-term))
+
+(acl2::defines
+ cut-dont-rw-with-term-2
+  :prepwork
+ ((local
+   (in-theory (disable logapp ))))
+ (define cut-dont-rw-with-term-2 ((dont-rw natp)
+                                (term))
+   :returns (mv (res natp :hyp (natp dont-rw))
+                (cut natp :hyp (natp dont-rw))
+                (cut-size natp :hyp (natp dont-rw)))
+   :measure (acl2-count term)
+   :verify-guards nil
+   (cond
+    ((or (atom term)
+         (acl2::fquotep term))
+     (progn$
+      (and (equal (acl2::logcar dont-rw) 0)
+           (hard-error 'cut-dont-rw-with-term
+                       "Unexpected dont-rw"
+                       nil))
+      (mv (acl2::logcdr dont-rw)
+          (acl2::logcar dont-rw)
+          1)))
+    ((= (acl2::logcar dont-rw) 1)
+     (mv (acl2::logcdr dont-rw) (acl2::logcar dont-rw) 1))
+    (t (b* (((mv dont-rw cut-dont-rw cut-dont-rw-size)
+             (cut-dont-rw-with-term-lst-2 (acl2::logcdr dont-rw) (cdr term))))
+         (mv dont-rw
+             (logapp 1 0 cut-dont-rw)
+             (1+ cut-dont-rw-size))))))
+ 
+ (define cut-dont-rw-with-term-lst-2 ((dont-rw natp)
+                                    (lst))
+   :measure (acl2-count lst)
+   :returns (mv (res natp :hyp (natp dont-rw))
+                (cut natp :hyp (natp dont-rw))
+                (cut-size natp :hyp (natp dont-rw)))
+   (if (atom lst)
+       (mv dont-rw 0 0)
+     (b* (((mv dont-rw cut1 cut1-size)
+           (cut-dont-rw-with-term-2 dont-rw (car lst)))
+          ((mv dont-rw cut2 cut2-size)
+           (cut-dont-rw-with-term-lst-2
+            dont-rw (cdr lst))))
+       (mv dont-rw
+           (logapp cut1-size cut1 cut2)
+           (+ cut1-size cut2-size)))))
+ ///
+ (local
+  (defthm natp-implies-integerp
+    (implies (natp x)
+             (and (integerp x)
+                  (acl2-numberp x)))))
+ 
+ (verify-guards cut-dont-rw-with-term-2
+   :hints (("Goal"
+            :in-theory (e/d () ())))))
+
+
+;; (generate-dont-rw-from-term '(f1 a b (f2 '3 (f4 b c "g" (f2 a)))))
+
+;; (cut-dont-rw-with-term #b10010111010110 '(f1 (f5 v) b (f2 '3 (f4 b c "g" (f2
+;;                                                                           a)))))
+;; (cut-dont-rw-with-term-2 #b10010111010110 '(f1 (f5 v) b (f2 '3 (f4 b c "g" (f2 a)))))
+
+(defmacro mv-nth$ (pos term total)
+  `(b* (((mv ,@(sas '?x 0 total))
+         ,term))
+     ,(sa 'x pos)))
+
+
+(define dont-rw-to-binary-string (dont-rw)
+  ;; :prepwork
+  ;; ((local
+  ;;   (include-book "arithmetic-5/top" :dir :system)))
+  :returns (res stringp :hyp (integerp dont-rw))
+  :verify-guards nil
+  (cond ((not dont-rw)
+         nil)
+        ((= (nfix dont-rw) 0)
+         "")
+        (t (str::cat
+            (str::intstr (acl2::logcar dont-rw))
+            (dont-rw-to-binary-string (acl2::logcdr (nfix dont-rw))))))
+  ///
+  (verify-guards dont-rw-to-binary-string)) 
+
+
+
+(acl2::defines
+ dont-rw-consistentp
+ (define dont-rw-consistentp-aux ((dont-rw natp)
+                                  (term))
+   :measure (acl2-count term)
+   :returns (mv (res-dont-rw natp :hyp (natp dont-rw))
+                (result booleanp))
+   :verify-guards nil
+   (b* ((bit0 (acl2::logcar dont-rw)))
+     (cond ((equal bit0 1)
+            (mv (acl2::logcdr dont-rw)
+                t))
+           ((or (atom term)
+                (acl2::fquotep term))
+            (mv (acl2::logcdr dont-rw)
+                nil)) ;; bit0 should be 1 so test fails
+           (t
+            (dont-rw-consistentp-aux-lst (acl2::logcdr dont-rw)
+                                         (cdr term))))))
+ (define dont-rw-consistentp-aux-lst ((dont-rw natp)
+                                      (lst))
+   :measure (acl2-count lst)
+   :returns (mv (res-dont-rw natp :hyp (natp dont-rw))
+                (result booleanp))
+   (if (atom lst)
+       (mv dont-rw t)
+     (b* (((mv dont-rw car-res)
+           (dont-rw-consistentp-aux dont-rw
+                                    (car lst)))
+          ((unless car-res)
+           (mv dont-rw nil)))
+       (dont-rw-consistentp-aux-lst dont-rw
+                                    (cdr lst)))))
+ ///
+ (verify-guards dont-rw-consistentp-aux))
+   
+
+
+(define dont-rw-consistentp ((dont-rw natp)
+                             (term))
+  (b* (((mv dont-rw res) (dont-rw-consistentp-aux dont-rw term)))
+    (and (equal dont-rw 0)
+         res)))
+
+
+#|(let ((term '(f1 a b (f2 '3 (f4 b c "g" (f2 a))))))
+  (dont-rw-consistentp (mv-nth$ 0 (generate-dont-rw-from-term term) 2) term))||#

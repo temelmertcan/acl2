@@ -36,7 +36,6 @@
 ; Original Author(s):
 ; Mertcan Temel         <mert@utexas.edu>
 
-
 (in-package "RP")
 (include-book "../extract-formula")
 
@@ -1046,8 +1045,9 @@
                             (rule-syntaxp
                              valid-rulep))))))
 
+(encapsulate
+  nil
 
-(progn
   (local
    (defthm valid-rulesp-try-to-add-rule-fnc-lemma-1
      (equal (valid-rulep-sk-body (change custom-rewrite-rule
@@ -1065,18 +1065,19 @@
                                       :rule-fnc x)))
      :otf-flg t
      :hints (("goal"
-              :expand (valid-rulep-sk (list* (car rule)
-                                             (cadr rule)
-                                             x (cdddr rule)))
+              :expand (VALID-RULEP-SK (LIST* (CAR RULE)
+                                             (CADR RULE)
+                                             (CADDR RULE)
+                                             (CADDDR RULE)
+                                             X))
               :use ((:instance valid-rulep-sk-necc
-                               (a (list* (car rule)
-                                         (cadr rule)
-                                         x (cdddr rule)))))
+                               (a (change custom-rewrite-rule
+                                          rule
+                                          :rule-fnc x))))
               :in-theory (e/d ()
                               (rule-syntaxp
                                valid-rulep-sk
                                valid-rulep-sk-body))))))
-
 
   (local
    (defthm valid-rulesp-try-to-add-rule-fnc-lemma-3
@@ -1102,6 +1103,90 @@
                               custom-rewrite-with-meta-extract
                               update-rules-with-sc))))))
 
+(encapsulate
+  nil
+
+  (local
+   (defthm valid-rulesp-add-dont-rw-to-rule-lemma-1
+     (equal (valid-rulep-sk-body (change custom-rewrite-rule
+                                         rule
+                                         :dont-rw dont-rw
+                                         :dont-rw-size dont-rw-size
+                                         :hyp-dont-rw hyp-dont-rw)
+                                 a)
+            (valid-rulep-sk-body rule a))))
+
+  (local
+   (defthm valid-rulesp-add-dont-rw-to-rule-lemma-2
+     (implies (valid-rulep-sk rule)
+              (valid-rulep-sk (change custom-rewrite-rule
+                                      rule
+                                      :dont-rw dont-rw
+                                      :dont-rw-size dont-rw-size
+                                      :hyp-dont-rw hyp-dont-rw)))
+     :otf-flg t
+     :hints (("goal"
+              :do-not '(preprocess)
+              :expand (VALID-RULEP-SK (LIST* (CAR RULE)
+                                             (CONS (CAR (CADR RULE)) HYP-DONT-RW)
+                                             (LIST* (CAR (CADDR RULE))
+                                                    DONT-RW DONT-RW-SIZE)
+                                             (CDDDR RULE)))
+              :use ((:instance valid-rulep-sk-necc
+                               (a (VALID-RULEP-SK-WITNESS (LIST* (CAR RULE)
+                                                                 (CONS (CAR (CADR RULE)) HYP-DONT-RW)
+                                                                 (LIST* (CAR (CADDR RULE))
+                                                                        DONT-RW DONT-RW-SIZE)
+                                                                 (CDDDR RULE))))))
+              :in-theory (e/d ()
+                              (rule-syntaxp
+                               valid-rulep-sk
+                               valid-rulep-sk-body))))))
+
+  (local
+   (defthm valid-rulesp-add-dont-rw-to-rule-lemma-3
+     (implies (and (valid-rulep rule)
+                   (natp dont-rw-size)
+                   (natp dont-rw)
+                   (natp hyp-dont-rw))
+              (valid-rulep (change custom-rewrite-rule
+                                   rule
+                                   :dont-rw dont-rw
+                                   :dont-rw-size dont-rw-size
+                                   :hyp-dont-rw hyp-dont-rw)))
+     :otf-flg t
+     :hints (("goal"
+              :in-theory (e/d (valid-rulep-sk-necc)
+                              (valid-rulep-sk
+                               natp
+                               ))))))
+
+  (defthm valid-rulep-try-to-add-dont-rw-to-rule
+    (implies (valid-rulep rule)
+             (valid-rulep (add-dont-rw-to-rule rule)))
+    :hints (("goal"
+             :in-theory (e/d (ADD-DONT-RW-TO-RULE
+                              len)
+                             (rule-syntaxp
+                              weak-custom-rewrite-rule-p
+                              valid-rulep
+                              check-if-def-rule-should-be-saved
+                              custom-rewrite-with-meta-extract
+                              update-rules-with-sc)))))
+
+  (defthm valid-rulesp-try-to-add-dont-rw-to-rules
+    (implies (valid-rulesp rules)
+             (valid-rulesp (add-dont-rw-to-rules rules)))
+    :hints (("goal"
+             :in-theory (e/d (ADD-DONT-RW-TO-RULEs
+                              len)
+                             (rule-syntaxp
+                              weak-custom-rewrite-rule-p
+                              valid-rulep
+                              check-if-def-rule-should-be-saved
+                              custom-rewrite-with-meta-extract
+                              update-rules-with-sc))))))
+
 (defthm valid-rulesp-get-rules
   (implies (rp-evl-meta-extract-global-facts :state state)
            (valid-rulesp (get-rule-list runes sc-alist new-synps rule-fnc-alist
@@ -1109,7 +1194,7 @@
   :hints (("Goal"
            :do-not-induct t
            :induct (get-rule-list runes sc-alist new-synps rule-fnc-alist
-                                        state)
+                                  state)
            :in-theory (e/d ()
                            (rule-syntaxp
                             WEAK-CUSTOM-REWRITE-RULE-P

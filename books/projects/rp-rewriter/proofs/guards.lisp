@@ -36,10 +36,11 @@
 ; Original Author(s):
 ; Mertcan Temel         <mert@utexas.edu>
 
-
 (in-package "RP")
 (include-book "../rp-rewriter")
+(include-book "../extract-formula")
 (local (include-book "rp-rw-lemmas"))
+(local (include-book "extract-formula-lemmas"))
 
 (encapsulate
   nil
@@ -60,7 +61,7 @@
      :hints (("Goal"
               :in-theory (e/d (is-rp-loose
                                ex-from-rp-loose) ())))))
-  
+
   (verify-guards rp-equal-cnt)
   (verify-guards rp-equal)
   (verify-guards rp-equal-loose))
@@ -304,7 +305,7 @@
    (implies (quotep term)
             (equal (equal (rp-rw term dont-rw context limit rules-alist exc-rules
                                  meta-rules iff-flg rp-state state)
-                          (list term rp-state))
+                          (list term (acl2::logcdr (nfix dont-rw)) rp-state))
                    t))
    :hints (("Goal"
             :expand (rp-rw term dont-rw context limit rules-alist
@@ -489,28 +490,85 @@
  (defthm integerp-of-rp-state-push-to-try-to-rw-stack
    (implies (rp-statep rp-state)
             (and (integerp (mv-nth 0 (rp-state-push-to-try-to-rw-stack rule var-bindings
-                                                                   rp-context
-                                                                   rp-state)))))
+                                                                       rp-context
+                                                                       rp-state)))))
    :hints (("Goal"
             :in-theory (e/d (rp-state-push-to-try-to-rw-stack) ())))))
 
+
+(local
+ (encapsulate
+   nil
+   (local
+    (include-book "ihs/ihs-lemmas" :dir :system))
+
+   (defthm natp-logcdr
+     (implies (and (natp x))
+              (natp (acl2::logcdr x)))
+     :rule-classes :type-prescription)
+
+   (defthm natp-logcar
+     (implies (and (natp x))
+              (natp (acl2::logcar x)))
+     :rule-classes :type-prescription)
+
+   (defthm natp-logapp
+     (implies (and (natp y)
+                   (natp x)
+                   (natp size))
+              (natp (logapp size x y)))
+     :rule-classes :type-prescription
+     :hints (("Goal"
+              :in-theory (e/d () (logapp)))))
+
+   (defthm natp-logapp-rw
+     (implies (and (natp y)
+                   (natp x)
+                   (natp size))
+              (natp (logapp size x y))))))
+
+(local
+ (defthm natp-implies
+   (implies (natp x)
+            (and (integerp x)
+                 (<= 0 x)))))
+
+(local
+ (defthm when-meta-rules-dont-change-the-term
+   (implies (not (mv-nth 0 (rp-rw-meta-rules term meta-rules rp-state state)))
+            (equal (mv-nth 1 (rp-rw-meta-rules term meta-rules rp-state state))
+                   term))
+   :rule-classes :forward-chaining))
+
 (verify-guards rp-rw
-  :otf-flg t
+; :otf-flg t
   :hints (("Goal"
            :do-not-induct t
            :in-theory (e/d
                        (dont-rw-if-fix-type
                         context-syntaxp-implies
-                        dont-rw-syntaxp
                         TRUE-LISTP
                         QUOTEP
                         )
-                       (
+                       (logapp
+
+; INTEGER-RANGE-P
+; UNSIGNED-BYTE-P
+                        nfix
+
+                        acl2::logcar
+                        acl2::logcdr
+                        RP-DONT-RW$INLINE
+                        RP-DONT-RW-SIZE$INLINE
+                        RP-HYP-DONT-RW$INLINE
+                        RP-STATEP
+;INTEGER-RANGE-P
                         pseudo-termp2
                         pseudo-term-listp2
                         ALL-FALIST-CONSISTENT-LST
                         FALIST-CONSISTENT
                         is-if
+                        natp
                         IS-FALIST
                         #|RP-RW-APPLY-FALIST-META||#
                         rp-rw-meta-rules
@@ -551,3 +609,221 @@
                  (:TYPE-PRESCRIPTION TRUE-LIST-LISTP)
                  (:TYPE-PRESCRIPTION EQLABLE-ALISTP)
                  (:TYPE-PRESCRIPTION SYMBOL-ALISTP))))))
+
+(local
+ (defthm weak-custom-rewrite-rule-listp-update-rules-with-sc
+   (implies (weak-custom-rewrite-rule-listp rules)
+            (weak-custom-rewrite-rule-listp
+             (update-rules-with-sc rules sc-alist state)))
+   :hints (("Goal"
+            :in-theory (e/d ()
+                            ((:REWRITE LEMMA11)
+                             (:DEFINITION MEMBER-EQUAL)
+                             (:DEFINITION ACL2::APPLY$-BADGEP)
+                             (:DEFINITION ALWAYS$)
+                             (:REWRITE ACL2::PLAIN-UQI-INTEGER-LISTP)
+                             (:REWRITE PSEUDO-TERM-LISTP2-LEMMA1)
+                             (:DEFINITION NATP)
+                             (:LINEAR ACL2::APPLY$-BADGEP-PROPERTIES . 1)
+                             (:REWRITE
+                              ACL2::INTEGER-LISTP-IMPLIES-ALWAYS$-INTEGERP)
+                             (:DEFINITION INTEGER-LISTP)
+                             (:REWRITE NATP-IMPLIES)
+                             (:REWRITE NOT-QUOTEP-IMPLIES)
+                             (:REWRITE ACL2::APPLY$-SYMBOL-ARITY-1)
+                             (:DEFINITION ATTACH-SC-LIST-TO-RHS)
+                             (:REWRITE ACL2::O-P-O-INFP-CAR)
+                             (:REWRITE NOT-INCLUDE-RP)
+                             (:REWRITE ACL2::PLAIN-UQI-ACL2-NUMBER-LISTP)
+                             (:REWRITE LEMMA6)))))))
+
+(local
+ (defthm weak-custom-rewrite-rule-listp-TRY-TO-ADD-RULE-FNC
+   (implies (weak-custom-rewrite-rule-listp rules)
+            (weak-custom-rewrite-rule-listp
+             (TRY-TO-ADD-RULE-FNC rules fnc-alist)))
+   :hints (("Goal"
+            :in-theory (e/d (TRY-TO-ADD-RULE-FNC
+                             WEAK-CUSTOM-REWRITE-RULE-P)
+                            ((:REWRITE LEMMA11)
+                             (:DEFINITION MEMBER-EQUAL)
+                             (:DEFINITION ACL2::APPLY$-BADGEP)
+                             (:DEFINITION ALWAYS$)
+                             (:REWRITE ACL2::PLAIN-UQI-INTEGER-LISTP)
+                             (:REWRITE PSEUDO-TERM-LISTP2-LEMMA1)
+                             (:DEFINITION NATP)
+                             (:LINEAR ACL2::APPLY$-BADGEP-PROPERTIES . 1)
+                             (:REWRITE
+                              ACL2::INTEGER-LISTP-IMPLIES-ALWAYS$-INTEGERP)
+                             (:DEFINITION INTEGER-LISTP)
+                             (:REWRITE NATP-IMPLIES)
+                             (:REWRITE NOT-QUOTEP-IMPLIES)
+                             (:REWRITE ACL2::APPLY$-SYMBOL-ARITY-1)
+                             (:DEFINITION ATTACH-SC-LIST-TO-RHS)
+                             (:REWRITE ACL2::O-P-O-INFP-CAR)
+                             (:REWRITE NOT-INCLUDE-RP)
+                             (:REWRITE ACL2::PLAIN-UQI-ACL2-NUMBER-LISTP)
+                             (:REWRITE LEMMA6)))))))
+
+(local
+ (defthm weak-custom-rewrite-rule-listp-FORMULAS-TO-RULES
+   (weak-custom-rewrite-rule-listp
+    (FORMULAS-TO-RULES rune rule-new-synp formulas))
+   :hints (("Goal"
+            :in-theory (e/d (FORMULAS-TO-RULES) ())))))
+
+(local
+ (defthm weak-custom-rewrite-rule-listp-CUSTOM-REWRITE-WITH-META-EXTRACT
+   (implies t
+            (weak-custom-rewrite-rule-listp
+             (CUSTOM-REWRITE-WITH-META-EXTRACT rule-name new-synp state)))
+   :otf-flg t
+   :hints (("Goal"
+            :in-theory (e/d (TRY-TO-ADD-RULE-FNC
+                             CUSTOM-REWRITE-WITH-META-EXTRACT
+                             NOT-TO-EQUAL-NIL-LIST
+                             IF-TO-AND-LIST
+                             MAKE-RULE-BETTER-AUX1
+                             IF-TO-AND-LIST
+                             WEAK-CUSTOM-REWRITE-RULE-LISTP
+                             WEAK-CUSTOM-REWRITE-RULE-P)
+                            ((:REWRITE LEMMA11)
+                             (:DEFINITION MEMBER-EQUAL)
+                             (:DEFINITION ACL2::APPLY$-BADGEP)
+                             (:DEFINITION ALWAYS$)
+                             (:REWRITE ACL2::PLAIN-UQI-INTEGER-LISTP)
+                             (:REWRITE PSEUDO-TERM-LISTP2-LEMMA1)
+                             (:DEFINITION NATP)
+                             (:LINEAR ACL2::APPLY$-BADGEP-PROPERTIES . 1)
+                             (:REWRITE
+                              ACL2::INTEGER-LISTP-IMPLIES-ALWAYS$-INTEGERP)
+                             (:DEFINITION INTEGER-LISTP)
+                             (:REWRITE NATP-IMPLIES)
+                             (:REWRITE NOT-QUOTEP-IMPLIES)
+                             (:REWRITE ACL2::APPLY$-SYMBOL-ARITY-1)
+                             (:DEFINITION ATTACH-SC-LIST-TO-RHS)
+                             (:REWRITE ACL2::O-P-O-INFP-CAR)
+                             (:REWRITE NOT-INCLUDE-RP)
+                             (:REWRITE ACL2::PLAIN-UQI-ACL2-NUMBER-LISTP)
+                             (:REWRITE LEMMA6)))))))
+
+
+
+(verify-guards get-rule-list
+  :hints (("Goal"
+           :in-theory (e/d ()
+                           ((:REWRITE
+                             VALID-RULESP-IMPLIES-RULE-LIST-SYNTAXP)
+                            (:DEFINITION VALID-RULESP)
+
+                            (:DEFINITION VALID-RULEP)
+                            (:DEFINITION VALID-RULEP-SK)
+                            (:REWRITE LEMMA11)
+                            (:DEFINITION VALID-RULEP-SK-BODY)
+                            (:DEFINITION PSEUDO-TERMP2)
+                            (:REWRITE RP-EVL-OF-RP-EQUAL2)
+                            (:DEFINITION RP-EQUAL2)
+                            (:DEFINITION EX-FROM-RP)
+                            (:DEFINITION RP-EQUAL)
+                            (:REWRITE RP-EQUAL-IMPLIES-RP-EQUAL2)
+                            (:DEFINITION RULE-LIST-SYNTAXP)
+                            (:DEFINITION ACL2::APPLY$-BADGEP)
+                            (:LINEAR ACL2::APPLY$-BADGEP-PROPERTIES . 1)
+                            (:REWRITE NOT-INCLUDE-RP)
+                            (:DEFINITION INCLUDE-FNC)
+                            (:DEFINITION SUBSETP-EQUAL)
+                            ASSOC-EQUAL
+                            FMT-TO-COMMENT-WINDOW
+                            FMT-TO-COMMENT-WINDOW
+;GLOBAL-TABLE
+;GET-GLOBAL
+;ALISTP
+                            )))))
+
+
+
+(local
+ (defthm weak-custom-rewrite-rule-listp-append
+   (implies (and (weak-custom-rewrite-rule-listp a)
+                 (weak-custom-rewrite-rule-listp b))
+            (weak-custom-rewrite-rule-listp (append a b)))))
+
+(local
+ (defthm weak-custom-rewrite-rule-listp-ADD-DONT-RW-TO-RULES
+   (implies (and (weak-custom-rewrite-rule-listp rules))
+            (weak-custom-rewrite-rule-listp
+             (ADD-DONT-RW-TO-RULES rules)))
+   :hints (("Goal"
+            :in-theory (e/d (ADD-DONT-RW-TO-RULES
+                             ADD-DONT-RW-TO-RULE
+                             WEAK-CUSTOM-REWRITE-RULE-P
+                             weak-custom-rewrite-rule-listp) ())))))
+
+(local
+ (defthm weak-custom-rewrite-rule-listp-get-rule-list
+   (implies t
+            (weak-custom-rewrite-rule-listp
+             (get-rule-list runes sc-table new-synps rule-fnc-alist state)))
+   :otf-flg t
+   :hints (("Goal"
+            :in-theory (e/d (get-rule-list)
+                            ((:REWRITE LEMMA11)
+                             (:REWRITE
+                              VALID-RULESP-IMPLIES-RULE-LIST-SYNTAXP)
+                             (:DEFINITION VALID-RULESP)
+                             (:DEFINITION VALID-RULEP)
+                             (:DEFINITION VALID-RULEP-SK)
+                             (:REWRITE VALID-RULESP-TRY-TO-ADD-RULE-FNC)
+                             CUSTOM-REWRITE-WITH-META-EXTRACT
+                             TRY-TO-ADD-RULE-FNC
+                             RULE-LIST-SYNTAXP
+                             UPDATE-RULES-WITH-SC
+                             ADD-DONT-RW-TO-RULES
+                             (:DEFINITION MEMBER-EQUAL)
+                             (:DEFINITION ACL2::APPLY$-BADGEP)
+                             (:DEFINITION ALWAYS$)
+                             (:REWRITE ACL2::PLAIN-UQI-INTEGER-LISTP)
+                             (:REWRITE PSEUDO-TERM-LISTP2-LEMMA1)
+                             (:DEFINITION NATP)
+                             (:LINEAR ACL2::APPLY$-BADGEP-PROPERTIES . 1)
+                             (:REWRITE
+                              ACL2::INTEGER-LISTP-IMPLIES-ALWAYS$-INTEGERP)
+                             (:DEFINITION INTEGER-LISTP)
+                             (:REWRITE NATP-IMPLIES)
+                             (:REWRITE NOT-QUOTEP-IMPLIES)
+                             (:REWRITE ACL2::APPLY$-SYMBOL-ARITY-1)
+                             (:DEFINITION ATTACH-SC-LIST-TO-RHS)
+                             (:REWRITE ACL2::O-P-O-INFP-CAR)
+                             (:REWRITE NOT-INCLUDE-RP)
+                             (:REWRITE ACL2::PLAIN-UQI-ACL2-NUMBER-LISTP)
+                             (:REWRITE LEMMA6)))))))
+
+(verify-guards get-rules-fn
+  :hints (("Goal"
+           :in-theory (e/d () ((:REWRITE
+                                VALID-RULESP-IMPLIES-RULE-LIST-SYNTAXP)
+                               (:DEFINITION VALID-RULESP)
+                               get-rule-list
+                               (:DEFINITION VALID-RULEP)
+                               (:DEFINITION VALID-RULEP-SK)
+                               (:REWRITE LEMMA11)
+                               (:DEFINITION VALID-RULEP-SK-BODY)
+                               (:DEFINITION PSEUDO-TERMP2)
+                               (:REWRITE RP-EVL-OF-RP-EQUAL2)
+                               (:DEFINITION RP-EQUAL2)
+                               (:DEFINITION EX-FROM-RP)
+                               (:DEFINITION RP-EQUAL)
+                               (:REWRITE RP-EQUAL-IMPLIES-RP-EQUAL2)
+                               (:DEFINITION RULE-LIST-SYNTAXP)
+                               (:DEFINITION ACL2::APPLY$-BADGEP)
+                               (:LINEAR ACL2::APPLY$-BADGEP-PROPERTIES . 1)
+                               (:REWRITE NOT-INCLUDE-RP)
+                               (:DEFINITION INCLUDE-FNC)
+                               (:DEFINITION SUBSETP-EQUAL)
+                               ASSOC-EQUAL
+                               FMT-TO-COMMENT-WINDOW
+                               FMT-TO-COMMENT-WINDOW
+;GLOBAL-TABLE
+;GET-GLOBAL
+;ALISTP
+                               )))))

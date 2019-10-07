@@ -31,7 +31,10 @@
  (in-theory (enable bits-sbits-no-syntaxp)))
 
 (local
- (in-theory (disable 4vec-zero-ext-is-bits)))
+ (in-theory (disable 4vec-zero-ext-is-bits
+                     logapp
+                     ash
+                     natp)))
 
 (encapsulate
   nil
@@ -141,16 +144,16 @@
 
   (define is-bits-of-bitand/or/xor (term)
     (case-match term
-                 (('bits ('4vec-bitand & &) ('quote s) ('quote w))
-                  (and (natp s)
-                       (natp w)))
-                 (('bits ('4vec-bitor & &) ('quote s) ('quote w))
-                  (and (natp s)
-                       (natp w)))
-                 (('bits ('sv::4vec-bitxor & &) ('quote s) ('quote w))
-                  (and (natp s)
-                       (natp w)))
-                 (& nil))
+      (('bits ('4vec-bitand & &) ('quote s) ('quote w))
+       (and (natp s)
+            (natp w)))
+      (('bits ('4vec-bitor & &) ('quote s) ('quote w))
+       (and (natp s)
+            (natp w)))
+      (('bits ('sv::4vec-bitxor & &) ('quote s) ('quote w))
+       (and (natp s)
+            (natp w)))
+      (& nil))
     ///
     (defthm is-bits-of-bitand/or/xor-implies
       (implies (is-bits-of-bitand/or/xor term)
@@ -187,7 +190,7 @@
           (progn$
            (cw "unexpected instances of bits of sbits ~%")
            (hard-error 'bits-of-meta-fn "error" nil)
-           (mv term nil)))
+           (mv term 1 1)))
          ((or (<= (+ start size) s-start) ;;case5
               (<= (+ s-start s-size) start))
           (bits-of-meta-fn `(bits ,old-val ',start ',size)))
@@ -199,26 +202,32 @@
                (< s-start (+ start size))
                (<= (+ start size)
                    (+ s-start s-size)))
-          (b* (((mv rest-term rest-dontrw)
+          (b* (((mv rest-term rest-dontrw rest-dontrw-size)
                 (bits-of-meta-fn `(bits ,old-val ',start ',(- s-start start) )))
-               ((mv rest-term2 rest-dontrw2)
+               ((mv rest-term2 rest-dontrw2 rest-dontrw2-size)
                 (bits-of-meta-fn `(bits ,val '0 ',(+ start size (- s-start)) ))))
             (mv `(4vec-concat$ ',(- s-start start)
                                ,rest-term
                                ,rest-term2)
-                `(nil t
-                      ,rest-dontrw
-                      ,rest-dontrw2))))
+                (logapp 2 #b10
+                        (logapp rest-dontrw-size
+                                rest-dontrw
+                                rest-dontrw2))
+                (+ 2 rest-dontrw-size
+                   rest-dontrw2-size)
+                #|`(nil t
+                ,rest-dontrw
+                ,rest-dontrw2)||#)))
          ((and (<= s-start start) ;;case 2
                (< start (+ s-start s-size))
                (< (+ s-start s-size)
                   (+ start size)))
-          (b* (((mv rest-term rest-dontrw)
+          (b* (((mv rest-term rest-dontrw rest-dontrw-size)
                 (bits-of-meta-fn `(bits ,val
                                         ',(- start s-start)
                                         ',(+ s-size s-start (- start))
                                         )))
-               ((mv rest-term2 rest-dontrw2)
+               ((mv rest-term2 rest-dontrw2 rest-dontrw2-size)
                 (bits-of-meta-fn `(bits ,old-val
                                         ',(+ s-start s-size)
                                         ',(+ size start (- (+ s-start s-size)))))))
@@ -226,19 +235,25 @@
                   ',(+ s-size s-start (- start))
                   ,rest-term
                   ,rest-term2)
-                `(nil
-                  t
-                  ,rest-dontrw
-                  ,rest-dontrw2))))
+                (logapp 2 #b10
+                        (logapp rest-dontrw-size
+                                rest-dontrw
+                                rest-dontrw2))
+                (+ 2 rest-dontrw-size
+                   rest-dontrw2-size)
+                #|`(nil
+                t
+                ,rest-dontrw
+                ,rest-dontrw2)||#)))
 
          ((and (< start s-start) ;;case 1
                (< (+ s-start s-size)
                   (+ start size)))
-          (b* (((mv rest-term2 rest-dont-rw2)
+          (b* (((mv rest-term2 rest-dont-rw2 rest-dont-rw2-size)
                 (bits-of-meta-fn `(bits ,old-val ',start ',(- s-start start) )))
-               ((mv rest-term3 rest-dont-rw3)
+               ((mv rest-term3 rest-dont-rw3 rest-dont-rw3-size)
                 (bits-of-meta-fn `(bits ,val '0 ',s-size )))
-               ((mv rest-term4 rest-dont-rw4)
+               ((mv rest-term4 rest-dont-rw4 rest-dont-rw4-size)
                 (bits-of-meta-fn `(bits ,old-val
                                         ',(+ s-start s-size)
                                         ',(- (+ start size) (+ s-start s-size))
@@ -246,14 +261,24 @@
             (mv `(4vec-concat$ ',(- s-start start)
                                ,rest-term2
                                (4vec-concat$ ',s-size ,rest-term3 ,rest-term4))
-                `(nil t
-                      ,rest-dont-rw2
-                      (nil t ,rest-dont-rw3 ,rest-dont-rw4)))))
+                (logapp 2 #b10
+                        (logapp rest-dont-rw2-size
+                                rest-dont-rw2
+                                (logapp 2 #b10
+                                        (logapp rest-dont-rw3-size
+                                                rest-dont-rw3
+                                                rest-dont-rw4))))
+                (+ 4 rest-dont-rw2-size
+                   rest-dont-rw3-size
+                   rest-dont-rw4-size)
+                #|`(nil t
+                ,rest-dont-rw2
+                (nil t ,rest-dont-rw3 ,rest-dont-rw4))||#)))
          (t
           (progn$
            (cw "unexpected instance of bits of sbits ~%")
            (hard-error 'bits-of-meta-fn "error" nil)
-           (mv term nil))))))
+           (mv term 1 1))))))
      ((is-bits-of-rsh term)
       (let ((start (car (cdr (car (cddr term)))))
             (size (car (cdr (car (cdr (cddr term))))))
@@ -267,7 +292,7 @@
           (progn$
            (cw "unexpected instance of bits of rsh ~%")
            (hard-error 'bits-of-meta-fn "error" nil)
-           (mv term nil)))))
+           (mv term 1 1)))))
 
      ((is-bits-of-concat term)
       (let ((start (car (cdr (car (cddr term)))))
@@ -281,32 +306,38 @@
                (progn$
                 (cw "unexpected instance of bits of concat Not natps ~%")
                 (hard-error 'bits-of-meta-fn "error" nil)
-                (mv term nil)))
+                (mv term 1 1)))
               ((<= c-size start) ;;case 2
                (bits-of-meta-fn `(bits ,term2 ',(- start c-size) ',size )))
               ((and (< start c-size) ;; case 3
                     (< c-size (+ start size)))
-               (b* (((mv rest-term1 rest-dontrw1)
+               (b* (((mv rest-term1 rest-dontrw rest-dontrw-size)
                      (bits-of-meta-fn `(bits ,term1
                                              ',start ',(- c-size start)
                                              )))
-                    ((mv rest-term2 rest-dontrw2)
+                    ((mv rest-term2 rest-dontrw2 rest-dontrw2-size)
                      (bits-of-meta-fn `(bits ,term2
                                              '0 ',(- size (- c-size start))
                                              ))))
                  (mv `(4vec-concat$ ',(- c-size start)
                                     ,rest-term1
                                     ,rest-term2)
-                     `(nil t
-                           ,rest-dontrw1
-                           ,rest-dontrw2))))
+                     (logapp 2 #b10
+                             (logapp rest-dontrw-size
+                                     rest-dontrw
+                                     rest-dontrw2))
+                     (+ 2 rest-dontrw-size
+                        rest-dontrw2-size)
+                     #|`(nil t
+                     ,rest-dontrw
+                     ,rest-dontrw2)||#)))
               ((<= (+ start size) c-size)
                (bits-of-meta-fn `(bits ,term1 ',start ',size )))
               (t
                (progn$
                 (cw "unexpected instance of bits of concats ~%")
                 (hard-error 'bits-of-meta-fn "error" nil)
-                (mv term nil))))))
+                (mv term 1 1))))))
      ((is-bits-0-1-of-a-bitp term)
       (bits-of-meta-fn (cadr term)))
      ((is-bits-of-bits term)
@@ -319,29 +350,36 @@
                 (progn$
                  (cw "unexpected instance of bits of concat Not natps ~%")
                  (hard-error 'bits-of-meta-fn "error" nil)
-                 (mv term nil)))
+                 (mv term 1 1)))
                ((< start1 size2)
                 (bits-of-meta-fn  `(bits ,x
                                          ',(+ start1 start2)
                                          ',(min size1 (- size2 start1))
                                          )))
-               (t (mv ''0 t))))
-        (& (mv term nil))))
+               (t (mv ''0 1 1))))
+        (& (mv term 1 1))))
      ((is-bits-of-bitand/or/xor term)
       (case-match term
         (('bits (fnc term1 term2) start size)
-         (b* (((mv rest1 dont-rw1)
+         (b* (((mv rest1 dont-rw1 dont-rw1-size)
                (bits-of-meta-fn `(bits ,term1 ,start ,size)))
-              ((mv rest2 dont-rw2)
+              ((mv rest2 dont-rw2 dont-rw2-size)
                (bits-of-meta-fn `(bits ,term2 ,start ,size))))
            (mv `(,fnc ,rest1 ,rest2)
-               `(nil ,dont-rw1 ,dont-rw2))))
-        (& (mv term nil))))
+               (logapp 1 0
+                       (logapp dont-rw1-size
+                               dont-rw1
+                               dont-rw2))
+               (+ 1 dont-rw1-size dont-rw2-size)
+               #|`(nil ,dont-rw1 ,dont-rw2)||#)))
+        (& (mv term 1 1))))
      (t
       (case-match term
         (('bits & ('quote &) ('quote &))
-         (mv term `(nil t t t)))
-        (& (mv term t)))))))
+         (mv term #b1110 4
+             #|`(nil t t t)||#
+             ))
+        (& (mv term 1 1)))))))
 
 (encapsulate
   nil
@@ -396,6 +434,17 @@
                      (:definition posp)
                      (:rewrite rp::measure-lemma7-2)
                      (:definition natp))))))))
+
+  (defthm natp-dont-rw-bits-of-meta-fn
+    (and (natp (mv-nth 1 (bits-of-meta-fn x)))
+         (natp (mv-nth 2 (bits-of-meta-fn x))))
+    :hints (("goal"
+             :in-theory (e/d ()
+                             (associativity-of-+
+                              acl2::commutativity-2-of-+
+                              commutativity-of-+
+                              acl2::distributivity-of-minus-over-+
+                              (:elim car-cdr-elim))))))
 
   (verify-guards bits-of-meta-fn))
 
@@ -469,9 +518,10 @@
 
   (defun concat-of-meta-fn (term limit)
     (declare (xargs :measure (nfix limit)
+                    :verify-guards nil
                     :guard (natp limit)))
     (if (zp limit)
-        (mv term t)
+        (mv term 1 1)
       (cond ((or (is-concat-of-concat$ term)
                  (is-concat$-of-concat$ term))
              (case-match term
@@ -481,40 +531,53 @@
                 (cond
                  ((not (and (natp size1)
                             (natp size2)))
-                  (mv term nil))
+                  (mv term 1 1))
                  ((<= size1 size2)
                   (concat-of-meta-fn `(4vec-concat ',size1 ,term1 ,term3)
                                      (1- limit)))
                  (t
-                  (b* (((mv rest rest-dontrw)
+                  (b* (((mv rest rest-dontrw rest-dontrw-size)
                         (concat-of-meta-fn `(4vec-concat ',(- size1 size2) ,term2
                                                          ,term3)
                                            (1- limit))))
                     (mv `(4vec-concat$ ',size2 ,term1
                                        ,rest)
-                        `(nil t t ,rest-dontrw))))))
-               (& (mv term t))))
+                        (logapp 3 #b110
+                                rest-dontrw)
+                        (+ 3 rest-dontrw-size)
+                        #|`(nil t t ,rest-dontrw)||#)))))
+               (& (mv term 1 1))))
             ((is-concat term)
              (case-match term
                (('4vec-concat ('quote size1) term1 term2)
 
                 (cond ((equal size1 0)
-                       (mv `(sv::4vec-fix$inline ,term2) `(nil t)))
+                       (mv `(sv::4vec-fix$inline ,term2) #b10 2 #|`(nil t)||#))
                       ((and (equal size1 1)
                             (equal term2 ''0))
                        (mv `(bits ,term1 '0 '1 )
-                           `(nil t t t)))
+                           #b1110 4
+                           #|`(nil t t t)||#))
                       (t
                        (mv
                         `(4vec-concat$ ',size1
                                        (bits ,term1 '0 ',size1 )
                                        ,term2)
-                        `(nil t (nil t t t) t)))))
-               (& (mv term t))))
+                        #b1111010 7
+                        #|`(nil t (nil t t t) t)||#))))
+               (& (mv term 1 1))))
             ((is-concat$ term)
-             (mv term `(nil t t t)))
+             (mv term #b1110 4 #|`(nil t t t)||#))
             (t
-             (mv term t)))))
+             (mv term 1 1)))))
+
+
+  
+   (defthm natp-dont-rw-concat-of-meta-fn
+     (and (natp  (mv-nth 1 (concat-of-meta-fn term limit)))
+          (natp  (mv-nth 2 (concat-of-meta-fn term limit)))))
+
+  (verify-guards concat-of-meta-fn)
 
   (defun concat-of-meta-fn-main (term)
     (concat-of-meta-fn term (expt 2 50)))
@@ -719,9 +782,7 @@
                               (rp::include-fnc
                                (:definition not)
                                (:definition natp)))))))
-  (local
-   (defthm dont-rw-syntaxp-concat-of-meta-fn
-     (rp::dont-rw-syntaxp  (mv-nth 1 (concat-of-meta-fn term limit)))))
+  
 
   (local
    (defthm rp-valid-termp-concat-of-meta-fn
@@ -744,9 +805,11 @@
     :hints (("Goal"
              :in-theory (e/d (rp::RP-META-VALID-SYNTAXP)
                              (rp::PSEUDO-TERMP2
+                              natp
                               rp::PSEUDO-TERM-LISTP2
                               concat-of-meta-fn
 ;(:type-prescription acl2::logicp)
+                              natp
 ;w
                               rp::RP-SYNTAXP
                               rp::VALID-SC)))))
@@ -769,6 +832,7 @@
                              (rp::PSEUDO-TERMP2
                               rp::PSEUDO-TERM-LISTP2
                               concat-of-meta-fn
+                              natp
                               rp::RP-SYNTAXP
                               rp::VALID-SC))))))
 
@@ -884,7 +948,6 @@
                                rp::is-rp)
                               (rp-evl-of-ex-from-rp))))))
 
-
   (local
    (defthm valid-sc-implies-when-is-IS-BITS-OF-BITAND/OR/XOR
      (implies (and (rp::valid-sc term a)
@@ -923,7 +986,6 @@
      :hints (("Goal"
               :in-theory (e/d (IS-BITS-OF-BITAND/OR/XOR) ())))))
 
-  
   (defthm eval-of-bits-of-meta-fn
     (implies (and (rp::valid-sc term a)
                   (rp-evl-meta-extract-global-facts)
@@ -939,16 +1001,6 @@
                              ((:definition not)
                               (:definition natp))))))
 
-  (local
-   (defthm dont-rw-syntaxp-bits-of-meta-fn
-     (rp::dont-rw-syntaxp (mv-nth 1 (bits-of-meta-fn x)))
-     :hints (("goal"
-              :in-theory (e/d ()
-                              (associativity-of-+
-                               acl2::commutativity-2-of-+
-                               commutativity-of-+
-                               acl2::distributivity-of-minus-over-+
-                               (:elim car-cdr-elim)))))))
 
   (local
    (defthmd rp-syntaxp-when-is-bits-of-sbits-lemma1
@@ -970,6 +1022,7 @@
               :use ((:instance rp-syntaxp-when-is-bits-of-sbits-lemma1
                                (term (cadr term))))
               :in-theory (e/d (rp::ex-from-rp
+                               natp
                                rp::is-rp) ())))))
 
   (local
@@ -1120,7 +1173,6 @@
                               bits-of-meta-fn
                               rp::pseudo-termp2
                               rp::rp-syntaxp)))))
-     
 
   (defthm valid-sc-resolve-bits-of-meta-fn
     (implies (and (rp::valid-sc term a)

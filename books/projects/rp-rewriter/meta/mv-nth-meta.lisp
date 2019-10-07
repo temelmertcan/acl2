@@ -56,13 +56,13 @@
          (b* (((mv res res-ok)
                (mv-nth-meta-aux index x)))
            (if (equal res-ok t)
-               (mv res t)
+               (mv res 1 1)
              (mv `(mv-nth ',res-ok ,res )
-                 `(nil t t))))
-       (mv term `(nil t t))))
+                 #b110 3)))
+       (mv term #b110 3)))
     (('mv-nth & &)
-     (mv term `(nil t t)))
-    (& (mv term nil))))
+     (mv term #b110 3))
+    (& (mv term 1 1))))
 
 (rp::def-formula-checks-default-evl
  rp::rp-evl
@@ -111,9 +111,10 @@
            :in-theory (e/d (rp::is-if
                             rp::is-rp) ()))))
 
-(defthm dont-rw-syntaxp-mv-nth-meta
+(defthm natp-dont-rw-mv-nth-meta
   (implies t
-           (rp::dont-rw-syntaxp (mv-nth 0 (mv-nth-meta term))))
+           (and (natp (mv-nth 1 (mv-nth-meta term)))
+                (natp (mv-nth 2 (mv-nth-meta term)))))
   :otf-flg t
   :hints (("Goal"
            :in-theory (e/d (rp::is-if
@@ -136,6 +137,7 @@
                             mv-nth-meta
                             rp::PSEUDO-TERM-LISTP2
                             rp::RP-SYNTAXP
+                            natp
                             rp::VALID-SC)))))
 
 (rp::add-meta-rules mv-nth-formula-checks

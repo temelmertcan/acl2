@@ -95,12 +95,12 @@
            `(falist ',(hons-acons key val fa)
                     (cons (cons ',key ,val)
                           ,ra))
-           t))
+           1 1))
          (''nil
           (mv
            `(falist ',(hons-acons key val nil)
                     (cons (cons ',key ,val) 'nil))
-           t))
+           1 1))
          (('quote fa)
           (if (alistp fa)
               (progn$
@@ -108,8 +108,8 @@
                (mv `(falist ',(hons-acons key val (quote-falist-vals falist))
                             (cons (cons ',key ,val)
                                   ,falist))
-                   t))
-            (mv term '(nil t t t))))
+                   1 1))
+            (mv term #b1110 4)))
          (&
           (progn$
            #|(FMT-TO-COMMENT-WINDOW "Invalid hons-acons term ~p0 ~%"
@@ -117,11 +117,11 @@
                                   0
                                   '(nil 8 10 nil)
                                   nil)||#
-           (mv  term '(nil t t t)))))))
+           (mv term #b1110 4))))))
     (& ;; otherwise return the term as is and let rewrite rules work it out.
      (progn$ (cw "Invalid hons-acons term (2) ~p0 ~%"
                  term)
-             (mv term nil)))))
+             (mv term 1 1)))))
 
 ;; :i-am-here
 
@@ -275,10 +275,11 @@
               (rp-syntaxp (mv-nth  0 (hons-acons-meta term)))))))
 
 (local
- (defthm dont-rw-syntaxp-hons-acons-meta
-   (dont-rw-syntaxp (mv-nth 1 (hons-acons-meta term)))
+ (defthm natp-dont-rw-hons-acons-meta
+   (and (natp (mv-nth 1 (hons-acons-meta term)))
+        (natp (mv-nth 2 (hons-acons-meta term))))
    :hints (("Goal"
-            :in-theory (e/d (DONT-RW-SYNTAXP)
+            :in-theory (e/d ()
                             ())))))
 
 (defthm hons-acons-meta-is-valid-rp-meta-rulep
@@ -298,6 +299,7 @@
                             hons-acons-meta
                             PSEUDO-TERM-LISTP2
                             RP-SYNTAXP
+                            natp
                             VALID-SC)))))
 
 (rp::add-meta-rules

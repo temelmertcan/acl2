@@ -32,7 +32,8 @@
  (in-theory (enable bits-sbits-no-syntaxp)))
 
 (local
- (in-theory (disable 4vec-zero-ext-is-bits)))
+ (in-theory (disable 4vec-zero-ext-is-bits
+                     logapp)))
 
 (local
  (include-book "projects/rp-rewriter/proofs/aux-function-lemmas" :dir :system))
@@ -52,30 +53,40 @@
                  (progn$
                   (cw "unexpected instances of 4vec-rsh of 4vec-concat$ ~%")
                   (hard-error '4vec-rsh-of-meta "error" nil)
-                  (mv term nil)))
+                  (mv term 1 1)))
                 ((<= s2 s1)
                  (4vec-rsh-of-meta `(4vec-rsh ',(- s1 s2) ,b)))
                 (t
                  (mv `(4vec-concat$ ',(- s2 s1)
                                     (bits ,a ',s1 ',(- s2 s1))
                                     ,b)
-                     `(nil t (nil t t t) t)))))
+                     ;;`(nil t (nil t t t) t)
+                     #b1111010
+                     7
+                     ))))
          (('4vec-rsh ('quote s2) a)
           (cond ((not (and (natp s1)
                            (natp s2)))
                  (progn$
                   (cw "unexpected instances of 4vec-rsh of 4vec-rsh ~%")
                   (hard-error '4vec-rsh-of-meta "error" nil)
-                  (mv term nil)))
+                  (mv term 1 1)))
                 (t
                  (mv `(4vec-rsh ',(+ s2 s1) ,a)
-                     `(nil t t)))))
+;;`(nil t t)
+                     #b110
+                     3
+                     ))))
          (&
-          (mv term `(nil t t))))))
+          (mv term
+              ;;`(nil t t)
+              #b110
+              3
+              )))))
     (& (progn$
         (cw "unexpected instances in 4vec-rsh-of-meta ~%")
         (hard-error '4vec-rsh-of-meta "error" nil)
-        (mv term nil)))))
+        (mv term 1 1)))))
 
 
 (encapsulate
@@ -117,9 +128,10 @@
      :hints (("Goal"
               :in-theory (e/d (4vec-rsh-of-meta) ()))))
 
-   (defthm dont-rw-syntaxp-of-4vec-rsh-of-meta
-     (implies (rp::dont-rw-syntaxp term)
-              (rp::dont-rw-syntaxp (mv-nth 1 (4vec-rsh-of-meta term))))
+   (defthm natp-dont-rw-of-4vec-rsh-of-meta
+     (implies t
+              (and (natp (mv-nth 1 (4vec-rsh-of-meta term)))
+                   (natp (mv-nth 2 (4vec-rsh-of-meta term)))))
      :hints (("Goal"
               :in-theory (e/d (4vec-rsh-of-meta) ()))))))
 
@@ -241,6 +253,7 @@
            :in-theory (e/d (rp::RP-META-VALID-SYNTAXP)
                            (rp::PSEUDO-TERMP2
                             rp::PSEUDO-TERM-LISTP2
+                            natp
                             rp::RP-SYNTAXP
                             rp::VALID-SC)))))
 

@@ -132,13 +132,13 @@
             (mv (if entry
                     `(cons ',(car entry) ,(cdr entry))
                   ''nil)
-                t)))
+                1 1)))
          (&
           (progn$
-           (mv term `(nil t t)))))))
+           (mv term #b110 3))))))
     (&
      (progn$
-      (mv term nil)))))
+      (mv term 1 1)))))
 
 (defun resolve-assoc-eq-vals-rec (keys alist)
   (declare (xargs :guard t))
@@ -193,9 +193,9 @@
      (b* ((falist (ex-from-rp falist)))
        (case-match falist
          (('falist ('quote fast-alist) &)
-          (mv (hons-get-list-values-term keys fast-alist) t))
-         (& (mv (resolve-assoc-eq-vals term) t)))))
-    (& (mv (resolve-assoc-eq-vals term) t))))
+          (mv (hons-get-list-values-term keys fast-alist) 1 1))
+         (& (mv (resolve-assoc-eq-vals term) 1 1)))))
+    (& (mv (resolve-assoc-eq-vals term) 1 1))))
 
 (def-formula-checks-default-evl
   rp-evl
@@ -947,18 +947,20 @@
               :in-theory (e/d (assoc-eq-vals-meta) ()))))))
 
 (local
- (defthm dont-rw-syntaxp-hons-get-meta
-   (dont-rw-syntaxp (mv-nth 1 (hons-get-meta term)))
+ (defthm natp-dont-rw-hons-get-meta
+   (and (natp (mv-nth 1 (hons-get-meta term)))
+        (natp (mv-nth 2 (hons-get-meta term))))
    :hints (("Goal"
-            :in-theory (e/d (DONT-RW-SYNTAXP
+            :in-theory (e/d (
                              hons-get-meta)
                             ())))))
 
 (local
- (defthm dont-rw-syntaxp-assoc-eq-vals-meta
-   (dont-rw-syntaxp (mv-nth 1 (assoc-eq-vals-meta term)))
+ (defthm natp-dont-rw--assoc-eq-vals-meta
+   (and (natp (mv-nth 1 (assoc-eq-vals-meta term)))
+        (natp (mv-nth 2 (assoc-eq-vals-meta term))))
    :hints (("Goal"
-            :in-theory (e/d (DONT-RW-SYNTAXP
+            :in-theory (e/d (
                              assoc-eq-vals-meta)
                             ())))))
 
@@ -977,6 +979,7 @@
            :in-theory (e/d (RP-META-VALID-SYNTAXP)
                            (PSEUDO-TERMP2
                             hons-get-meta
+                            natp
                             PSEUDO-TERM-LISTP2
                             RP-SYNTAXP
                             VALID-SC)))))
@@ -995,6 +998,7 @@
   :hints (("Goal"
            :in-theory (e/d (RP-META-VALID-SYNTAXP)
                            (PSEUDO-TERMP2
+                            natp
                             assoc-eq-vals-meta
                             PSEUDO-TERM-LISTP2
                             RP-SYNTAXP

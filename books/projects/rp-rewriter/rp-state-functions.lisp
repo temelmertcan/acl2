@@ -46,15 +46,20 @@
   (show-used-rules-flg :type (satisfies booleanp) :initially nil)
   (count-used-rules-flg :type (satisfies booleanp) :initially nil)
   (rules-used :type (satisfies alistp) :initially nil)
-
   (rp-brr :type (satisfies booleanp) :initially nil)
   (rw-stack-size :type (satisfies integerp) :initially 0)
   (rw-stack :type (satisfies alistp) :initially nil)
   (rule-frame-cnts :type (satisfies alistp) :initially nil)
-
   (rw-step-limit :type (unsigned-byte 58) :initially 100000)
+  (not-simplified-action :type (satisfies symbolp) :initially :error)
 
-  (not-simplified-action :type (satisfies symbolp) :initially :error))
+  ;; stuff for rp-rw and sub functions to return around.
+  (rw-term )
+  (rw-changed-flg :type (satisfies booleanp))
+  (rw-dont-rw :type (satisfies natp) :initially 0)
+  (rw-dont-rw-size :type (satisfies natp) :initially 0)
+  ;:inline t
+  )
 
 (defund rp-state-new-run (rp-state)
   (declare (xargs :stobjs (rp-state)))

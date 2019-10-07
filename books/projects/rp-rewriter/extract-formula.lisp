@@ -171,7 +171,10 @@
                      :hyp hyp
                      :flg flg
                      :lhs lhs
-                     :rhs rhs))
+                     :rhs rhs
+                     :dont-rw-size 0
+                     :dont-rw 0
+                     :hyp-dont-rw 0))
          (rest (formulas-to-rules rune rule-new-synp (cdr formulas))))
       (if (and (rule-syntaxp rule)
                (not (include-fnc rhs 'rp)))
@@ -411,6 +414,28 @@
           rules))
     rules))
 
+
+(define add-dont-rw-to-rule (rule)
+  :guard (weak-custom-rewrite-rule-p rule)
+  (b* (((mv dont-rw dont-rw-size)
+        (generate-dont-rw-from-term (rp-rhs rule)))
+       ((mv hyp-dont-rw &)
+        (generate-dont-rw-from-term (rp-hyp rule))))
+    (change custom-rewrite-rule
+            rule
+            :dont-rw dont-rw
+            :dont-rw-size dont-rw-size
+            :hyp-dont-rw hyp-dont-rw)))
+
+(define add-dont-rw-to-rules (rules)
+  :guard (weak-custom-rewrite-rule-listp rules)
+  (if (atom rules)
+      nil
+    (cons (add-dont-rw-to-rule (car rules))
+          (add-dont-rw-to-rules (cdr rules)))))
+
+
+
 (defun get-rule-list (runes sc-alist new-synps rule-fnc-alist state)
   (declare (xargs :guard (and (symbol-symbol-alistp sc-alist)
                               (alistp new-synps))
@@ -418,11 +443,10 @@
                   (("Goal"
                     :in-theory (e/d () (rule-syntaxp
                                         update-rules-with-sc
-                                        MAKE-FORMULA-BETTER
-                                        CUSTOM-REWRITE-WITH-META-EXTRACT
-                                        ))))
+                                        make-formula-better
+                                        custom-rewrite-with-meta-extract))))
                   :stobjs (state)
-                  :verify-guards t))
+                  :verify-guards nil))
   (if (atom runes)
       nil
     (b* ((rune (car runes))
@@ -455,10 +479,12 @@
          (rules (custom-rewrite-with-meta-extract rule-name rule-new-synp
                                                   state))
          (rules (try-to-add-rule-fnc rules rule-fnc-alist))
+         
          ((when (not (rule-list-syntaxp rules)))
           (or (cw "Warning a problem with rule-list ~p0 ~%" rules)
               (get-rule-list (cdr runes) sc-alist new-synps rule-fnc-alist state)))
-         (rules (update-rules-with-sc rules sc-alist state)))
+         (rules (update-rules-with-sc rules sc-alist state))
+         (rules (add-dont-rw-to-rules rules)))
       (append rules (get-rule-list (cdr runes) sc-alist new-synps rule-fnc-alist state)))))
 
 (defun to-fast-alist (alist)
@@ -487,7 +513,7 @@
 (define get-rules (runes state &key new-synps)
   (declare (xargs :guard (alistp new-synps)
                   :stobjs (state)
-                  :verify-guards t))
+                  :verify-guards nil))
   (declare (ignorable new-synps))
   (b* ((sc-alist (table-alist 'rp-sc (w state)))
        ((when (not (symbol-symbol-alistp sc-alist)))
@@ -500,7 +526,8 @@
                                  new-synps
                                  rule-fnc-alist
                                  state))
-       ((when (not (weak-custom-rewrite-rule-listp rule-list)))
+       ((when (mbe :logic (not (weak-custom-rewrite-rule-listp rule-list))
+                   :exec nil))
         (hard-error
          'get-rules
          "Something is wrong with the rewrite rule list format"

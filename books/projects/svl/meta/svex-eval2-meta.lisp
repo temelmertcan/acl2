@@ -23,8 +23,6 @@
 ;
 ; Original author: Mertcan Temel <mert@utexas.edu>
 
-
-
 (in-package "SVL")
 
 (include-book "../svex-lemmas2")
@@ -35,32 +33,80 @@
 (local
  (include-book "projects/rp-rewriter/proofs/eval-functions-lemmas" :dir :system))
 
+;; (include-book "projects/rp-rewriter/case-match2" :dir :system)
+
+
+
 ;; does not seem to help much but will keep it anyways..
 (define is-4vec-fix-necessary (term)
-  (case-match term
-    (('rp ''4vec-p &)
-     nil)
-    (& (b* ((term (rp::ex-from-rp term)))
-         (case-match term
-           (('quote x)
-            (if (integerp x)
-                nil
-              t))
-           (('4vec-concat & & &)
-            nil)
-           (('4vec-bitand & &)
-            nil)
-           (('4vec-bitor & &)
-            nil)
-           (('4vec-rsh & &)
-            nil)
-           (('4vec-lsh & &)
-            nil)
-           (('4vec-bitnot &)
-            nil)
-           ;; this list can go on with all the 4vec-functions...
-           (&
-            t))))))
+  (declare (xargs :guard-debug t)
+           (ignorable term))
+  :guard-hints (("Goal"
+                 :in-theory (e/d ()
+                                 (rp::ex-from-rp))))
+
+  nil #|(not
+   (or (and (consp term)
+            (consp (cdr term))
+            (and (equal (car term) 'rp)
+                 (or (equal (cadr term) ''4vec-p)
+                     (equal (cadr term) ''bitp)
+                     (equal (cadr term) ''natp)
+                     (equal (cadr term) ''integerp))))
+       (b* ((term (rp::ex-from-rp term)))
+         (and (consp term)
+              (or (equal (car term) '4vec-concat)
+                  (equal (car term) '4vec-concat$)
+                  (equal (car term) '4vec-bitand)
+                  (equal (car term) '4vec-bitor)
+                  (equal (car term) '4vec-rsh)
+                  (equal (car term) '4vec-lsh)
+                  (equal (car term) '4vec-bitnot)
+                  (equal (car term) '4vec-part-select)
+                  (equal (car term) 'bits)
+                  (equal (car term) 'sbits))))))||#)
+
+  ;; (rp::case-match2
+  ;;  term
+  ;;  (('rp ''4vec-p &)
+  ;;   nil)
+  ;;  (('rp ''BITP &)
+  ;;   nil)
+  ;;  (('rp ''natp &)
+  ;;   nil)
+  ;;  (('rp ''integerp &)
+  ;;   nil)
+  ;;  (& (b* ((term (rp::ex-from-rp term)))
+  ;;       (if (and (quotep term)
+  ;;                (consp (cdr term))
+  ;;                (integerp (cadr term)))
+  ;;           nil
+  ;;         (rp::case-match2
+  ;;          term
+  ;;          (('4vec-concat & & &)
+  ;;           nil)
+  ;;          (('4vec-bitand & &)
+  ;;           nil)
+  ;;          (('4vec-bitor & &)
+  ;;           nil)
+  ;;          (('4vec-rsh & &)
+  ;;           nil)
+  ;;          (('4vec-lsh & &)
+  ;;           nil)
+  ;;          (('4vec-bitnot &)
+  ;;           nil)
+  ;;          (('4vec-part-select & & &)
+  ;;           nil)
+  ;;          (('bits & & &)
+  ;;           nil)
+  ;;          (('4vec-part-install & & & &)
+  ;;           nil)
+  ;;          (('sbits & & & &)
+  ;;           nil)
+  ;;          ;; this list can go on with all the 4vec-functions...
+  ;;          (&
+  ;;           t)))))))
+
 
 (define nth-term (n argsvar)
   :guard (natp n)
@@ -70,25 +116,46 @@
         (car argsvar)
       (nth-term (1- n) (cdr argsvar)))))
 
-(defund svex-apply-collect-args2-meta (n max argsvar args-dontrw)
+(define nth-nat (n argsvar)
+  :guard (and (natp n)
+              (nat-listp argsvar))
+  :returns (res natp :hyp (nat-listp argsvar))
+  (if (atom argsvar)
+      0
+    (if (zp n)
+        (car argsvar)
+      (nth-nat (1- n) (cdr argsvar)))))
+
+(defund svex-apply-collect-args2-meta (n max argsvar args-dontrw args-dontrw-size)
   (declare (xargs :measure (nfix (- (nfix max) (nfix n)))))
   (let* ((n (nfix n)) (max (nfix max)))
     (if (zp (- max n))
-        (mv nil nil)
-      (b* (((mv rest rest-dontrw)
+        (mv #|nil||# nil 0 0)
+      (b* (((mv #|rest-b*||# rest rest-dontrw rest-dontrw-size)
             (svex-apply-collect-args2-meta (+ 1 n)
                                            max argsvar
-                                           args-dontrw)))
-        (mv (cons `(if (is-4vec-fix-necessary (nth-term ,n ,argsvar))
-                       (list '4vec-fix2 (nth-term ,n ,argsvar))
-                     (nth-term ,n ,argsvar))
-                  rest)
-            (cons `(if (is-4vec-fix-necessary (nth-term ,n ,argsvar))
-                       (list 'nil (nth-term ,n ,args-dontrw))
-                     (nth-term ,n ,args-dontrw))
-                  rest-dontrw))))))
+                                           args-dontrw
+                                           args-dontrw-size)))
+        (mv #|(cons `(,(sa 'fix-nec n)
+                    (is-4vec-fix-necessary (nth-term ,n ,argsvar)))
+                  rest-b*)||#
 
-(defund svex-apply-cases-fn2-meta (argsvar args-dontrw optable)
+            (cons `;;(if ,(sa 'fix-nec n)
+                   ;;   (list '4vec-fix2 (nth-term ,n ,argsvar))
+                     (nth-term ,n ,argsvar) ;;)
+                  rest)
+            `(logapp
+              (nth-nat ,n ,args-dontrw-size)
+              (nth-nat ,n ,args-dontrw)
+              ,rest-dontrw)
+            `(+ (nth-nat ,n ,args-dontrw-size)
+                ,rest-dontrw-size)
+            #|(cons `(if ,(sa 'fix-nec n)
+            (list 'nil (nth-term ,n ,args-dontrw)) ;
+            (nth-term ,n ,args-dontrw)) ;
+            rest-dontrw)||#)))))
+
+(defund svex-apply-cases-fn2-meta (argsvar args-dontrw args-dontrw-size optable)
   (b* (((when (atom optable))
         '((otherwise
            (mv (or (hard-error
@@ -96,31 +163,45 @@
                     "attempting to apply unknown function ~x0~%"
                     (list (cons #\0 fn)))
                    (list 'quote (sv::4vec-x)))
-               nil))))
+               1 1))))
        ((list sym fn args) (car optable))
-       ((mv entry entry-dontrw)
-        (svex-apply-collect-args2-meta 0 (len args) argsvar args-dontrw))
-       (call `(mv (list ',fn . ,entry)
-                  (list 'nil . ,entry-dontrw))))
+       ((mv #|b*-cases||# entry entry-dontrw entry-dontrw-size)
+        (svex-apply-collect-args2-meta 0 (len args) argsvar args-dontrw args-dontrw-size))
+       (call `;(b* ,b*-cases
+                (mv (list ',fn . ,entry)
+                    (logapp 1 0 ,entry-dontrw)
+                    (1+ ,entry-dontrw-size)
+;(list 'nil . ,entry-dontrw)
+                    )))
     (cons (cons sym (cons call 'nil))
-          (svex-apply-cases-fn2-meta argsvar args-dontrw (cdr optable)))))
+          (svex-apply-cases-fn2-meta argsvar args-dontrw args-dontrw-size (cdr optable)))))
 
-(defmacro svex-apply-cases2-meta (fn args args-dontrw)
+(defmacro svex-apply-cases2-meta (fn args args-dontrw args-dontrw-size)
   (cons
    'case
    (cons fn
-         (svex-apply-cases-fn2-meta args args-dontrw
+         (svex-apply-cases-fn2-meta args args-dontrw args-dontrw-size
                                     (cons '(ID sv::4VEC-FIX$INLINE (ACL2::X)
                                                "identity function") ;; had to
                                           ;; change this becaise 4vec-fix is
                                           ;; the only function that is inlined
                                           (cdr sv::*svex-op-table*))))))
 
-(defund svex-apply2-meta (fn args args-dontrw)
+(local
+ (in-theory (disable logapp
+                     ash
+                     natp)))
+
+(define svex-apply2-meta (fn args args-dontrw args-dontrw-size)
   (declare (xargs :guard (and (true-listp args)
-                              (true-listp args-dontrw))))
+                              (nat-listp args-dontrw)
+                              (nat-listp args-dontrw-size))))
+  :returns (mv (result)
+               (result-dont-rw natp :hyp (and (nat-listp args-dontrw)
+                                              (nat-listp args-dontrw-size)))
+               (result-dont-rw-size natp :hyp (nat-listp args-dontrw-size)))
   (let* ((fn (fnsym-fix fn)))
-    (svex-apply-cases2-meta fn args args-dontrw)))
+    (svex-apply-cases2-meta fn args args-dontrw args-dontrw-size)))
 
 (acl2::defines
  svex-eval2-meta
@@ -135,62 +216,70 @@
                              measure-lemmas) ())))
    :verify-guards nil
    :returns (mv (result)
-                (result-dont-rw rp::dont-rw-syntaxp))
+                (result-dont-rw natp)
+                (result-dont-rw-size natp))
    (let* ((x.kind (svex-kind2 x)))
      (case
        x.kind
        (:quote (mv (cond ((atom x) (list 'quote x))
                          ((atom (cdr x)) (list 'quote (sv::4vec-x)))
                          (t (list 'quote (cadr x))))
-                   t))
+                   1
+                   1))
        (:var (mv (let* ((val (hons-get x env-falist)))
                    (if val
                        (cdr val)
                      (list 'quote (sv::4vec-x))))
-                 t))
+                 1
+                 1))
        (otherwise
         (b* ((x.fn (car x))
              (x.args (cdr x))
-             ((mv args args-dontrw)
+             ((mv args args-dontrw args-dontrw-size)
               (svex-eval2-meta-lst x.args env-falist)))
-          (svex-apply2-meta x.fn args args-dontrw))))))
+          (svex-apply2-meta x.fn args args-dontrw args-dontrw-size))))))
 
  (define svex-eval2-meta-lst (lst env-falist)
    :flag list
    :measure (cons-count lst)
    :returns (mv (res true-listp)
-                (res-dontrw rp::dont-rw-syntaxp))
+                (res-dontrw nat-listp)
+                (res-dontrw-size nat-listp))
    (if (atom lst)
-       (mv nil nil)
-     (b* (((mv car-term car-dontrw)
+       (mv nil nil nil)
+     (b* (((mv car-term car-dontrw car-dontrw-size)
            (svex-eval2-meta (car lst) env-falist))
-          ((mv rest rest-dontrw)
+          ((mv rest rest-dontrw rest-dontrw-size)
            (svex-eval2-meta-lst (cdr lst) env-falist)))
        (mv (cons car-term rest)
-           (cons car-dontrw rest-dontrw)))))
+           (cons car-dontrw rest-dontrw)
+           (cons car-dontrw-size rest-dontrw-size)))))
 
  ///
 
- (acl2::more-returns
-  svex-eval2-meta-lst
-  (res-dontrw true-listp
-              :hints (("Goal"
-                       :induct (true-listp lst)
-                       :in-theory (e/d () ())))))
+ #|(acl2::more-returns
+ svex-eval2-meta-lst
+ (res-dontrw true-listp
+ :hints (("Goal"
+ :induct (true-listp lst)
+ :in-theory (e/d () ())))))||#
 
  (verify-guards svex-eval2-meta
    :hints (("Goal"
             :in-theory (e/d (svex-kind) ())))))
 
 (define svex-eval2-meta-main (term)
+  :returns (mv (result)
+               (result-dont-rw natp)
+               (result-dont-rw-size natp))
   (case-match term
     (('svex-eval2 ('quote svex) env)
      (b* ((env (rp::ex-from-rp env)))
        (case-match env
          (('falist ('quote env-falist) &)
           (svex-eval2-meta svex env-falist))
-         (& (mv term nil)))))
-    (& (mv term nil))))
+         (& (mv term 1 1)))))
+    (& (mv term 1 1))))
 
 ;; (svex-eval2-meta '(partsel '0 '1 (bitand x y))
 ;;                  (make-fast-alist
@@ -208,6 +297,11 @@
  rp::rp-evl
  (strip-cars rp::*small-evl-fncs*))
 
+(local
+ (in-theory (disable (:REWRITE ACL2::FIX-UNDER-NUMBER-EQUIV)
+                     (:REWRITE ACL2::FOLD-CONSTS-IN-+)
+                     (:DEFINITION FIX))))
+
 (encapsulate
   nil
   (local
@@ -217,12 +311,50 @@
                    (svex-kind2-is-svex-kind
                     4VEC-FIX2-IS-4VEC-FIX
                     SVEX-APPLY2-IS-SVEX-APPLY
-                    SV::4VEC-EQUAL))))
+                    logapp
+                    SV::4VEC-EQUAL
+
+                    (:TYPE-PRESCRIPTION SVEXLIST-P)
+                    (:TYPE-PRESCRIPTION SVEX-ENV-P)
+
+                    (:TYPE-PRESCRIPTION SV::SVARLIST-P)
+                    (:TYPE-PRESCRIPTION SV::SVAR-MAP-P)
+                    (:TYPE-PRESCRIPTION SV::SVAR-BOOLMASKS-P)
+                    (:TYPE-PRESCRIPTION SV::SVAR-ALIST-P)
+                    (:TYPE-PRESCRIPTION RP::PSEUDO-TERMP2)
+                    (:TYPE-PRESCRIPTION ACL2::ELEMENT-LIST-P)
+                    (:TYPE-PRESCRIPTION STR::DIGIT-LISTP)
+                    (:TYPE-PRESCRIPTION SV::CONSTRAINTLIST-P)
+                    (:TYPE-PRESCRIPTION SV::4VECLIST-P)
+                    (:REWRITE
+                     RP::RP-EVL-OF-RP-EQUAL-SUBTERMS-CALL)
+                    (:REWRITE
+                     RP::RP-EVL-OF-RP-EQUAL-CNT-SUBTERMS-CALL)
+                    (:REWRITE RP::RP-EVL-OF-RP-EQUAL-CNT-CALL)
+                    (:REWRITE RP::RP-EVL-OF-RP-EQUAL-CALL)
+                    (:REWRITE DEFAULT-CAR)
+                    (:REWRITE DEFAULT-CDR)
+                    (:REWRITE ACL2::SYMBOL-LISTP-IMPLIES-SYMBOLP)
+                    (:REWRITE
+                     RP::ATOM-PSEUDO-TERMP2-IS-SYMBOLP)
+                    ACL2::FIX-UNDER-NUMBER-EQUIV
+                    (:REWRITE COMMUTATIVITY-OF-+)
+                    (:REWRITE ACL2::FOLD-CONSTS-IN-+)
+                    (:REWRITE ACL2::COMMUTATIVITY-2-OF-+)
+                    ))))
 
   (local
    (defthm the-check-def
      (equal (the-check x y z)
             z)))
+
+  (local
+   (defthm fix-if-nth-nat
+     (implies (integer-listp y)
+              (equal (fix (nth-nat x y))
+                     (nth-nat x y)))
+     :hints (("Goal"
+              :in-theory (e/d (nth-nat fix) ())))))
 
   (local
    (defthm SVEX-ENV-FASTLOOKUP2-def
@@ -238,6 +370,10 @@
     (rp::def-formula-checks
      svex-eval2-formula-checks
      (svex-eval2-meta-main
+      bits
+      sbits
+      4vec-concat$
+      4vec-bitnot$
       sv::4vec-fix$inline
       svex-eval2))))
 
@@ -319,6 +455,9 @@
    :hints (("Goal"
             :in-theory (e/d (4vec-fix) ())))))||#
 
+
+
+
 (local
  (encapsulate
    nil
@@ -378,7 +517,7 @@
    (defthm rp-evl-of-svex-apply2-meta
      (implies (and (rp-evl-meta-extract-global-facts)
                    (svex-eval2-formula-checks state))
-              (equal (rp-evl (mv-nth 0 (svex-apply2-meta call args args-dontrw)) a)
+              (equal (rp-evl (mv-nth 0 (svex-apply2-meta call args args-dontrw args-dontrw-size)) a)
                      (svex-apply2 call
                                   (rp-evl-lst args a))))
      :hints (("goal"
@@ -529,7 +668,7 @@
    (defthm all-falist-consistent-svex-apply2-meta
      (implies (rp::all-falist-consistent-lst args)
               (rp::all-falist-consistent
-               (mv-nth 0 (svex-apply2-meta call args args-dontrw))))
+               (mv-nth 0 (svex-apply2-meta call args args-dontrw args-dontrw-size))))
      :hints (("Goal"
               :do-not-induct t
               :expand ((:free (x y)
@@ -631,7 +770,7 @@
    (defthm pseudo-termp2-svex-apply2-meta
      (implies (rp::pseudo-term-listp2 args)
               (rp::pseudo-termp2
-               (mv-nth 0 (svex-apply2-meta call args args-dontrw))))
+               (mv-nth 0 (svex-apply2-meta call args args-dontrw args-dontrw-size))))
      :hints (("Goal"
               :do-not-induct t
               :expand ((:free (x y)
@@ -724,7 +863,7 @@
    (defthm rp-syntaxp-svex-apply2-meta
      (implies (rp::rp-syntaxp-lst args)
               (rp::rp-syntaxp
-               (mv-nth 0 (svex-apply2-meta call args args-dontrw))))
+               (mv-nth 0 (svex-apply2-meta call args args-dontrw args-dontrw-size))))
      :hints (("Goal"
               :do-not-induct t
               :expand ((:free (x y)
@@ -820,7 +959,7 @@
    (defthm valid-sc-svex-apply2-meta
      (implies (rp::valid-sc-subterms args a)
               (rp::valid-sc
-               (mv-nth 0 (svex-apply2-meta call args args-dontrw))
+               (mv-nth 0 (svex-apply2-meta call args args-dontrw args-dontrw-size))
                a))
      :hints (("Goal"
               :do-not-induct t
@@ -924,6 +1063,7 @@
                            (rp::PSEUDO-TERMP2
                             svex-eval2-meta-main
                             rp::PSEUDO-TERM-LISTP2
+                            natp
                             rp::VALID-SC
                             rp::VALID-SC)))))
 
